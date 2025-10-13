@@ -1,2 +1,11 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Base de datos PostgreSQL
+DATABASE_URL="postgresql://usuario:password@localhost:5432/policlinico?schema=public"
+
+# Puerto del servidor
+PORT=3000
+
+# Entorno
+NODE_ENV=development
+
+# CORS - URL del frontend
+FRONTEND_URL="http://localhost:5173"
