@@ -1,8 +1,16 @@
-import express from 'express';
+import express from "express";
+import {
+  crearCita,
+  listarCitas,
+  obtenerCita,
+  eliminarCita,
+} from "../controllers/cita.controller";
+
 const router = express.Router();
 
-router.get('/', (req, res) => {
-  res.json({ message: 'Rutas de Citas funcionando 📅' });
-});
+router.post("/", crearCita);
+router.get("/", listarCitas);
+router.get("/:id", obtenerCita);
+router.delete("/:id", eliminarCita);
 
 export default router;

@@ -1,23 +1,19 @@
-import express from 'express';
-import Paciente from '../models/Paciente';
+import express from "express";
+import {
+  crearPaciente,
+  listarPacientes,
+  obtenerPaciente,
+  actualizarPaciente,
+  eliminarPaciente,
+} from "../controllers/paciente.controller";
+
 const router = express.Router();
 
-// Ping (salud del módulo)
-router.get('/', (_req, res) => {
-  res.json({ message: 'Rutas de Pacientes funcionando 🚑' });
-});
-
-// Seed rápido para probar DB (crea un paciente)
-router.post('/seed', async (_req, res, next) => {
-  try {
-    const p = await Paciente.create({
-      nombres: 'Juan',
-      apellidos: 'Pérez',
-      dni: String(Math.floor(Math.random()*90000000)+10000000),
-      telefono: '999999999',
-    });
-    res.json({ ok: true, paciente: p });
-  } catch (e) { next(e); }
-});
+// /api/pacientes
+router.post("/", crearPaciente);
+router.get("/", listarPacientes);
+router.get("/:id", obtenerPaciente);
+router.put("/:id", actualizarPaciente);
+router.delete("/:id", eliminarPaciente);
 
 export default router;
