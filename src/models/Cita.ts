@@ -1,13 +1,20 @@
-import mongoose from "mongoose";
+import mongoose, { Schema, Document } from "mongoose";
 
-const citaSchema = new mongoose.Schema(
+export interface ICita extends Document {
+  pacienteId: mongoose.Types.ObjectId;
+  doctorId: mongoose.Types.ObjectId;
+  fecha: Date;
+  hora: string;
+}
+
+const citaSchema = new Schema<ICita>(
   {
-    pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true },
-    doctorId: { type: mongoose.Schema.Types.ObjectId, ref: "Doctor", required: true },
-    fecha: { type: String, required: true }, // formato "YYYY-MM-DD"
-    hora: { type: String, required: true }   // formato "HH:mm"
+    pacienteId: { type: Schema.Types.ObjectId, ref: "Paciente", required: true },
+    doctorId: { type: Schema.Types.ObjectId, ref: "Doctor", required: true },
+    fecha: { type: Date, required: true },
+    hora: { type: String, required: true },
   },
   { timestamps: true }
 );
 
-export const Cita = mongoose.model("Cita", citaSchema);
+export const Cita = mongoose.model<ICita>("Cita", citaSchema);

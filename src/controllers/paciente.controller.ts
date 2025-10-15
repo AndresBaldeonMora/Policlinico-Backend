@@ -37,26 +37,34 @@ export const obtenerPaciente = async (req: Request, res: Response) => {
   }
 };
 
-// ✅ Actualizar paciente
-export const actualizarPaciente = async (req: Request, res: Response) => {
+// ✅ Buscar paciente por DNI
+export const buscarPacientePorDni = async (req: Request, res: Response) => {
   try {
-    const paciente = await Paciente.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!paciente)
-      return res.status(404).json({ success: false, message: "Paciente no encontrado" });
-    res.json({ success: true, message: "Paciente actualizado", data: paciente });
-  } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+    const { dni } = req.params;
+    const paciente = await Paciente.findOne({ dni });
 
-// ✅ Eliminar paciente
-export const eliminarPaciente = async (req: Request, res: Response) => {
-  try {
-    const paciente = await Paciente.findByIdAndDelete(req.params.id);
-    if (!paciente)
-      return res.status(404).json({ success: false, message: "Paciente no encontrado" });
-    res.json({ success: true, message: "Paciente eliminado correctamente" });
+    if (!paciente) {
+      return res.status(404).json({
+        success: false,
+        message: "No se encontró ningún paciente con ese DNI",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        _id: paciente._id,
+        dni: paciente.dni,
+        nombres: paciente.nombres,
+        apellidos: paciente.apellidos,
+        telefono: paciente.telefono,
+        correo: paciente.correo,
+      },
+    });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };

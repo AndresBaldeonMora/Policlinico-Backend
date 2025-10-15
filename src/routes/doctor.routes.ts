@@ -1,18 +1,12 @@
 import express from "express";
-import {
-  crearDoctor,
-  listarDoctores,
-  obtenerDoctor,
-  actualizarDoctor,
-  eliminarDoctor,
-} from "../controllers/doctor.controller";
+import { listarDoctores, obtenerDoctor } from "../controllers/doctor.controller";
 
 const router = express.Router();
 
-router.post("/", crearDoctor);
+// Listar todos los doctores
 router.get("/", listarDoctores);
+
+// Obtener un doctor por su ID
 router.get("/:id", obtenerDoctor);
-router.put("/:id", actualizarDoctor);
-router.delete("/:id", eliminarDoctor);
 
 export default router;

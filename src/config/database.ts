@@ -5,8 +5,8 @@ dotenv.config();
 
 const connectDB = async () => {
   try {
-    const uri = process.env.DATABASE_URL as string;
-    if (!uri) throw new Error('DATABASE_URL no definida en .env');
+    const uri = process.env.MONGODB_URI as string;  // Cambiado de DATABASE_URL a MONGODB_URI
+    if (!uri) throw new Error('MONGODB_URI no definida en .env');
     await mongoose.connect(uri);
     console.log('✅ Conectado a MongoDB');
   } catch (err: any) {
