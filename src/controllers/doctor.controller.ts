@@ -22,3 +22,22 @@ export const obtenerDoctor = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// **Nueva función para obtener doctores por especialidad**
+export const obtenerDoctoresPorEspecialidad = async (req: Request, res: Response) => {
+  const especialidadId = req.params.especialidadId;
+
+  try {
+    // Buscar los doctores que coinciden con el especialidadId
+    const doctores = await Doctor.find({ especialidad: especialidadId }); // Asegúrate de que la propiedad 'especialidad' esté correctamente definida en tu modelo
+
+    if (doctores.length > 0) {
+      return res.json({ success: true, data: doctores });
+    } else {
+      return res.status(404).json({ success: false, message: "No hay doctores disponibles para esta especialidad" });
+    }
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Error al obtener doctores" });
+  }
+};
