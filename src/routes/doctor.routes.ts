@@ -3,13 +3,13 @@ import { listarDoctores, obtenerDoctor, obtenerDoctoresPorEspecialidad } from ".
 
 const router = express.Router();
 
+// **Nueva Ruta para obtener doctores por especialidad**
+router.get("/especialidad/:especialidadId", obtenerDoctoresPorEspecialidad);
+
 // Listar todos los doctores
 router.get("/", listarDoctores);
 
 // Obtener un doctor por su ID
 router.get("/:id", obtenerDoctor);
-
-// **Nueva Ruta para obtener doctores por especialidad**
-router.get("/especialidad/:especialidadId", obtenerDoctoresPorEspecialidad);
 
 export default router;
