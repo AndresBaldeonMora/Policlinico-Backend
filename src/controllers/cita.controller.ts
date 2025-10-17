@@ -1,14 +1,27 @@
 import { Request, Response } from "express";
 import { Cita } from "../models/Cita";
+import { Paciente } from "../models/Paciente";
+import { Doctor } from "../models/Doctor";
 
-// Crear cita
+// 🧩 Función auxiliar: calcula el estado actual de una cita
+const calcularEstado = (fecha: Date, hora: string, estado: string): string => {
+  if (estado === "reprogramado") return "reprogramado"; // prioridad
+
+  const ahora = new Date();
+  const fechaHoraCita = new Date(fecha);
+  const [horas, minutos] = hora.split(":").map(Number);
+  fechaHoraCita.setHours(horas, minutos, 0, 0);
+
+  const diferenciaMin = (ahora.getTime() - fechaHoraCita.getTime()) / (1000 * 60);
+  if (diferenciaMin > 30) return "finalizado";
+  return "pendiente";
+};
+
+// 🟢 Crear cita
 export const crearCita = async (req: Request, res: Response) => {
   try {
     const { pacienteId, doctorId, fecha, hora } = req.body;
 
-    console.log('📥 Datos recibidos:', { pacienteId, doctorId, fecha, hora });
-
-    // Validar campos requeridos
     if (!pacienteId || !doctorId || !fecha || !hora) {
       return res.status(400).json({
         success: false,
@@ -16,7 +29,6 @@ export const crearCita = async (req: Request, res: Response) => {
       });
     }
 
-    // Verificar si ya existe una cita para ese doctor en esa fecha y hora
     const citaExistente = await Cita.findOne({
       doctorId,
       fecha: new Date(fecha),
@@ -30,7 +42,6 @@ export const crearCita = async (req: Request, res: Response) => {
       });
     }
 
-    // Crear la cita
     const nuevaCita = new Cita({
       pacienteId,
       doctorId,
@@ -40,9 +51,6 @@ export const crearCita = async (req: Request, res: Response) => {
     });
 
     await nuevaCita.save();
-
-    console.log('✅ Cita creada:', nuevaCita);
-
     res.status(201).json({
       success: true,
       data: nuevaCita,
@@ -58,13 +66,14 @@ export const crearCita = async (req: Request, res: Response) => {
   }
 };
 
-// Listar citas
+// 🟣 Listar citas (con DNI, paciente, doctor y especialidad)
 export const listarCitas = async (_req: Request, res: Response) => {
   try {
     const citas = await Cita.find()
       .populate("pacienteId", "nombres apellidos dni")
       .populate({
         path: "doctorId",
+        select: "nombres apellidos especialidadId",
         populate: {
           path: "especialidadId",
           select: "nombre",
@@ -72,14 +81,45 @@ export const listarCitas = async (_req: Request, res: Response) => {
       })
       .sort({ fecha: -1, hora: -1 });
 
-    res.json({ success: true, data: citas });
+    const citasProcesadas = citas.map((cita, index) => {
+      const paciente = cita.pacienteId as any;
+      const doctor = cita.doctorId as any;
+
+      const fechaFormateada = new Date(cita.fecha).toLocaleDateString("es-PE", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+
+      const estadoActual = calcularEstado(cita.fecha, cita.hora, cita.estado);
+
+      return {
+        id: index + 1,
+        _id: cita._id,
+        dni: paciente?.dni || "—",
+        paciente: `${paciente?.nombres || ""} ${paciente?.apellidos || ""}`.trim(),
+        doctor: doctor
+          ? `${doctor?.nombres || ""} ${doctor?.apellidos || ""}`.trim()
+          : "Sin asignar",
+        especialidad: doctor?.especialidadId?.nombre || "Sin especialidad",
+        fecha: fechaFormateada,
+        hora: cita.hora,
+        estado: estadoActual,
+      };
+    });
+
+    res.json({ success: true, data: citasProcesadas });
   } catch (error: any) {
-    console.error("Error al listar citas:", error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error("❌ Error al listar citas:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error al listar citas",
+      error: error.message,
+    });
   }
 };
 
-// Eliminar cita
+// 🔴 Eliminar cita
 export const eliminarCita = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -97,7 +137,46 @@ export const eliminarCita = async (req: Request, res: Response) => {
       message: "Cita eliminada exitosamente",
     });
   } catch (error: any) {
-    console.error("Error al eliminar cita:", error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error("❌ Error al eliminar cita:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error al eliminar cita",
+      error: error.message,
+    });
+  }
+};
+
+// 🔵 Reprogramar cita
+export const reprogramarCita = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { fecha, hora } = req.body;
+
+    const cita = await Cita.findById(id);
+    if (!cita) {
+      return res.status(404).json({
+        success: false,
+        message: "Cita no encontrada",
+      });
+    }
+
+    cita.fecha = new Date(fecha);
+    cita.hora = hora;
+    cita.estado = "reprogramado";
+
+    await cita.save();
+
+    res.json({
+      success: true,
+      data: cita,
+      message: "Cita reprogramada exitosamente",
+    });
+  } catch (error: any) {
+    console.error("❌ Error al reprogramar cita:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error al reprogramar cita",
+      error: error.message,
+    });
   }
 };

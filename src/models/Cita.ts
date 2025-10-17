@@ -1,3 +1,4 @@
+// src/models/Cita.ts
 import mongoose, { Schema, Document } from "mongoose";
 
 export interface ICita extends Document {
@@ -5,6 +6,7 @@ export interface ICita extends Document {
   doctorId: mongoose.Types.ObjectId;
   fecha: Date;
   hora: string;
+  estado: "pendiente" | "reprogramado" | "finalizado"; // ✅ agregado
 }
 
 const citaSchema = new Schema<ICita>(
@@ -13,6 +15,11 @@ const citaSchema = new Schema<ICita>(
     doctorId: { type: Schema.Types.ObjectId, ref: "Doctor", required: true },
     fecha: { type: Date, required: true },
     hora: { type: String, required: true },
+    estado: {
+      type: String,
+      enum: ["pendiente", "reprogramado", "finalizado"], // ✅ enum
+      default: "pendiente",
+    },
   },
   { timestamps: true }
 );
