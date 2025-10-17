@@ -10,7 +10,24 @@ const pacienteSchema = new mongoose.Schema(
     direccion: { type: String },
     fechaNacimiento: { type: Date },
   },
-  { timestamps: true }
+  { 
+    timestamps: true,
+    toJSON: { virtuals: true },  // ✅ para incluir virtuales en respuestas JSON
+    toObject: { virtuals: true } // ✅ también en objetos normales
+  }
 );
+
+// 🔹 Campo virtual para calcular edad automáticamente
+pacienteSchema.virtual("edad").get(function () {
+  if (!this.fechaNacimiento) return null;
+  const hoy = new Date();
+  const fechaNac = new Date(this.fechaNacimiento);
+  let edad = hoy.getFullYear() - fechaNac.getFullYear();
+  const mes = hoy.getMonth() - fechaNac.getMonth();
+  if (mes < 0 || (mes === 0 && hoy.getDate() < fechaNac.getDate())) {
+    edad--;
+  }
+  return edad;
+});
 
 export const Paciente = mongoose.model("Paciente", pacienteSchema);
