@@ -2,7 +2,6 @@ import express from "express";
 import {
   crearCita,
   listarCitas,
-  eliminarCita,
   reprogramarCita,
 } from "../controllers/cita.controller";
 
@@ -17,7 +16,5 @@ router.get("/", listarCitas);
 // 🔵 Reprogramar cita (cambia fecha y hora)
 router.put("/:id/reprogramar", reprogramarCita);
 
-// 🔴 Eliminar cita
-router.delete("/:id", eliminarCita);
 
 export default router;
