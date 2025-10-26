@@ -1,4 +1,4 @@
-// src/controllers/cita.controller.ts
+// src/controllers/cita.controller.ts (FINAL)
 
 import { Request, Response } from "express";
 import { Cita } from "../models/Cita";
@@ -14,7 +14,6 @@ const calcularEstado = (fecha: Date, hora: string, estado: string): string => {
   const [horas, minutos] = hora.split(":").map(Number);
   
   // Usamos setHours para establecer la hora de la cita en la hora local.
-  // Esto es vital para calcular el estado correctamente sin errores de zona horaria.
   fechaHoraCita.setHours(horas, minutos, 0, 0);
 
   const diferenciaMin = (ahora.getTime() - fechaHoraCita.getTime()) / (1000 * 60);
@@ -23,7 +22,7 @@ const calcularEstado = (fecha: Date, hora: string, estado: string): string => {
 };
 
 /**
- * Función auxiliar para crear un objeto Date en la hora local 
+ * Función auxiliar para crear un objeto Date en la zona horaria local 
  * a partir de una cadena YYYY-MM-DD.
  * Esto corrige el error de "Invalid Date" y el problema de la zona horaria.
  */
@@ -49,7 +48,7 @@ export const crearCita = async (req: Request, res: Response) => {
         // ✅ CORRECCIÓN 1: Usar la función auxiliar para crear la fecha localmente
         const fechaInicioDia = crearFechaLocal(fecha);
         
-        // Verificación de seguridad
+        // Verificación de seguridad (soluciona CastError: Invalid Date)
         if (isNaN(fechaInicioDia.getTime())) {
             return res.status(400).json({
                 success: false,
@@ -95,63 +94,66 @@ export const crearCita = async (req: Request, res: Response) => {
 };
 // ---------------------------------------------------------------
 
-// 🟣 Listar citas (se mantiene, el formateo a string DD/MM/YYYY es correcto aquí)
+// 🟣 Listar citas (con DNI, paciente, doctor y especialidad)
+// 🟣 Listar citas (con DNI, paciente, doctor y especialidad)
 export const listarCitas = async (_req: Request, res: Response) => {
-    try {
-        const citas = await Cita.find()
-          .populate("pacienteId", "nombres apellidos dni")
-          .populate({
-            path: "doctorId",
-            select: "nombres apellidos especialidadId",
-            populate: {
-              path: "especialidadId",
-              select: "nombre",
-            },
-          })
-          .sort({ fecha: -1, hora: -1 });
+    try {
+        const citas = await Cita.find()
+          .populate("pacienteId", "nombres apellidos dni")
+          .populate({
+            path: "doctorId",
+            select: "nombres apellidos especialidadId",
+            populate: {
+              path: "especialidadId",
+              select: "nombre",
+            },
+          })
+          .sort({ _id: -1 }); 
 
-        const citasProcesadas = citas.map((cita, index) => {
-            const paciente = cita.pacienteId as any;
-            const doctor = cita.doctorId as any;
+        const citasProcesadas = citas.map((cita, index) => {
+            const paciente = cita.pacienteId as any;
+            const doctor = cita.doctorId as any;
 
-            // El formateo de fecha aquí es correcto para la visualización en el frontend.
-            const fechaFormateada = new Date(cita.fecha).toLocaleDateString("es-PE", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-            });
+            const fechaFormateada = new Date(cita.fecha).toLocaleDateString("es-PE", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+            });
 
-            const estadoActual = calcularEstado(cita.fecha, cita.hora, cita.estado);
+            const estadoActual = calcularEstado(cita.fecha, cita.hora, cita.estado);
 
-            return {
-                id: index + 1,
-                _id: cita._id,
-                dni: paciente?.dni || "—",
-                paciente: `${paciente?.nombres || ""} ${paciente?.apellidos || ""}`.trim(),
-                doctor: doctor
-                  ? `${doctor?.nombres || ""} ${doctor?.apellidos || ""}`.trim()
-                  : "Sin asignar",
-                especialidad: doctor?.especialidadId?.nombre || "Sin especialidad",
-                fecha: fechaFormateada,
-                hora: cita.hora,
-                estado: estadoActual,
-            };
-        });
+            return {
+                id: index + 1, 
+                _id: cita._id,
+                dni: paciente?.dni || "—",
+                paciente: `${paciente?.nombres || ""} ${paciente?.apellidos || ""}`.trim(),
+                doctor: doctor
+                  ? `${doctor?.nombres || ""} ${doctor?.apellidos || ""}`.trim()
+                  : "Sin asignar",
+                doctorId: doctor?._id || "", // ✅ AGREGAR ESTA LÍNEA
+                especialidad: doctor?.especialidadId?.nombre || "Sin especialidad",
+                fecha: fechaFormateada,
+                hora: cita.hora,
+                estado: estadoActual,
+            };
+        });
 
-        res.json({ success: true, data: citasProcesadas });
-    } catch (error: any) {
-        console.error("❌ Error al listar citas:", error);
-        res.status(500).json({
-            success: false,
-            message: "Error al listar citas",
-            error: error.message,
-        });
-    }
+        res.json({ success: true, data: citasProcesadas });
+    } catch (error: any) {
+        console.error("❌ Error al listar citas:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error al listar citas",
+            error: error.message,
+        });
+    }
 };
 // ---------------------------------------------------------------
 
 // 🔴 Eliminar cita (FUNCIÓN ELIMINADA por política de no eliminación directa)
-// La función ha sido removida completamente.
+/*
+export const eliminarCita = async (req: Request, res: Response) => { ... };
+*/
 // ---------------------------------------------------------------
 
 // 🔵 Reprogramar cita
