@@ -1,8 +1,8 @@
-import express from 'express';
+import express from "express";
+import { listarEspecialidades } from "../controllers/especialidad.controller";
+
 const router = express.Router();
 
-router.get('/', (req, res) => {
-  res.json({ message: 'Rutas de Especialidades funcionando 🧬' });
-});
+router.get("/", listarEspecialidades);
 
 export default router;

@@ -4,7 +4,7 @@
 import express from 'express';
 import cors from 'cors';
 import pacienteRoutes from './routes/paciente.routes';
-import especialidadRoutes from './routes/especialidad.routes';
+import especialidadRoutes from "./routes/especialidad.routes";
 import doctorRoutes from './routes/doctor.routes';
 import citaRoutes from './routes/cita.routes';
 import { errorHandler } from './middlewares/errorHandler';
@@ -33,7 +33,7 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/pacientes', pacienteRoutes);
-app.use('/api/especialidades', especialidadRoutes);
+app.use("/api/especialidades", especialidadRoutes);
 app.use('/api/doctores', doctorRoutes);
 app.use('/api/citas', citaRoutes);
 app.use('/api/test', testRoutes);
