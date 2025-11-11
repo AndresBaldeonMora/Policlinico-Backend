@@ -9,6 +9,7 @@ import doctorRoutes from './routes/doctor.routes';
 import citaRoutes from './routes/cita.routes';
 import { errorHandler } from './middlewares/errorHandler';
 import testRoutes from './routes/test.routes';
+import authRoutes from "./routes/auth.routes";
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use("/api/especialidades", especialidadRoutes);
 app.use('/api/doctores', doctorRoutes);
 app.use('/api/citas', citaRoutes);
 app.use('/api/test', testRoutes);
+app.use("/auth", authRoutes);
 
 app.use(errorHandler);
 
