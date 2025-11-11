@@ -38,7 +38,7 @@ app.use("/api/especialidades", especialidadRoutes);
 app.use('/api/doctores', doctorRoutes);
 app.use('/api/citas', citaRoutes);
 app.use('/api/test', testRoutes);
-app.use("/auth", authRoutes);
+app.use("/api/auth", authRoutes);
 
 app.use(errorHandler);
 
