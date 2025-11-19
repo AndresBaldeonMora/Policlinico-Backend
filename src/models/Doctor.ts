@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document } from "mongoose";
 
+// Definimos la interfaz del Doctor
 export interface IDoctor extends Document {
   nombres: string;
   apellidos: string;
@@ -10,6 +11,7 @@ export interface IDoctor extends Document {
   cmp?: string;     // ✅ Opcional, si quieres mostrar número de colegiatura
 }
 
+// Definimos el esquema del Doctor
 const doctorSchema = new Schema<IDoctor>(
   {
     nombres: {
@@ -53,4 +55,5 @@ const doctorSchema = new Schema<IDoctor>(
   }
 );
 
+// Exportamos el modelo Doctor
 export const Doctor = mongoose.model<IDoctor>("Doctor", doctorSchema);

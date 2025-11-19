@@ -1,12 +1,10 @@
-// ============================================
-// src/app.ts
-// ============================================
 import express from 'express';
 import cors from 'cors';
 import pacienteRoutes from './routes/paciente.routes';
 import especialidadRoutes from "./routes/especialidad.routes";
 import doctorRoutes from './routes/doctor.routes';
 import citaRoutes from './routes/cita.routes';
+import horarioRoutes from './routes/horario.routes'; // Importar las rutas de horarios
 import { errorHandler } from './middlewares/errorHandler';
 import testRoutes from './routes/test.routes';
 import authRoutes from "./routes/auth.routes";
@@ -29,6 +27,7 @@ app.get('/', (req, res) => {
       especialidades: '/api/especialidades',
       doctores: '/api/doctores',
       citas: '/api/citas',
+      horarios: '/api/horarios',  // Endpoint de horarios agregado
     }
   });
 });
@@ -37,9 +36,11 @@ app.use('/api/pacientes', pacienteRoutes);
 app.use("/api/especialidades", especialidadRoutes);
 app.use('/api/doctores', doctorRoutes);
 app.use('/api/citas', citaRoutes);
+app.use('/api/horarios', horarioRoutes); // Agregar las rutas de horarios
 app.use('/api/test', testRoutes);
 app.use("/api/auth", authRoutes);
 
 app.use(errorHandler);
 
 export default app;
+  
