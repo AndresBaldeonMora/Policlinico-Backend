@@ -8,7 +8,7 @@ export const crearPaciente = async (req: Request, res: Response) => {
     res.status(201).json({
       success: true,
       message: "Paciente creado correctamente",
-      data: paciente, // ✅ incluye la edad virtual automáticamente
+      data: paciente,
     });
   } catch (error: any) {
     console.error("❌ Error al crear paciente:", error);
@@ -19,7 +19,7 @@ export const crearPaciente = async (req: Request, res: Response) => {
 // 🟣 Listar todos los pacientes
 export const listarPacientes = async (_req: Request, res: Response) => {
   try {
-    const pacientes = await Paciente.find(); // ✅ sin .lean() para mantener virtuals
+    const pacientes = await Paciente.find();
     res.json({ success: true, data: pacientes });
   } catch (error: any) {
     console.error("❌ Error al listar pacientes:", error);
@@ -48,7 +48,11 @@ export const obtenerPaciente = async (req: Request, res: Response) => {
 export const buscarPacientePorDni = async (req: Request, res: Response) => {
   try {
     const { dni } = req.params;
-    const paciente = await Paciente.findOne({ dni });
+
+    // Si tienes virtual edad configurado en el schema:
+    // PacienteSchema.set('toJSON', { virtuals: true });
+    // entonces esto ya incluirá edad.
+    const paciente: any = await Paciente.findOne({ dni });
 
     if (!paciente) {
       return res.status(404).json({
@@ -57,18 +61,9 @@ export const buscarPacientePorDni = async (req: Request, res: Response) => {
       });
     }
 
-    // ✅ Incluimos edad calculada desde el virtual del modelo
     res.json({
       success: true,
-      data: {
-        _id: paciente._id,
-        dni: paciente.dni,
-        nombres: paciente.nombres,
-        apellidos: paciente.apellidos,
-        telefono: paciente.telefono,
-        correo: paciente.correo,
-        edad: (paciente as any).edad || null, // ⚙️ se incluye explícitamente
-      },
+      data: paciente,
     });
   } catch (error: any) {
     console.error("❌ Error al buscar paciente por DNI:", error);
