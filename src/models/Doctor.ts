@@ -7,8 +7,9 @@ export interface IDoctor extends Document {
   correo: string;
   telefono: string;
   especialidadId: mongoose.Types.ObjectId;
-  cvUrl?: string;   // ✅ Para ver CV en el front
-  cmp?: string;     // ✅ Opcional, si quieres mostrar número de colegiatura
+  usuarioId?: mongoose.Types.ObjectId; // ✅ NUEVO: Vincula con Usuario
+  cvUrl?: string;
+  cmp?: string;
 }
 
 // Definimos el esquema del Doctor
@@ -39,6 +40,13 @@ const doctorSchema = new Schema<IDoctor>(
       type: Schema.Types.ObjectId,
       ref: "Especialidad",
       required: true,
+    },
+    usuarioId: {
+      type: Schema.Types.ObjectId,
+      ref: "Usuario",
+      // ✅ OPCIONAL: Si quieres que sea único (un usuario = un doctor)
+      // unique: true,
+      // sparse: true,
     },
     cvUrl: {
       type: String,
