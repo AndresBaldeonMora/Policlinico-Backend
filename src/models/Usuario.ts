@@ -8,7 +8,8 @@ export interface IUsuario extends Document {
   correo: string;
   passwordHash: string;
   rol: RolUsuario;
-  medicoId?: mongoose.Types.ObjectId; // opcional, si este usuario pertenece a un médico
+  // ✅ AGREGAMOS ESTO: Para vincular al médico
+  medicoId?: mongoose.Types.ObjectId; 
 }
 
 const usuarioSchema = new Schema<IUsuario>(
@@ -22,9 +23,11 @@ const usuarioSchema = new Schema<IUsuario>(
       enum: ["RECEPCIONISTA", "MEDICO"],
       required: true,
     },
+    // ✅ AGREGAMOS ESTO AL SCHEMA
     medicoId: {
       type: Schema.Types.ObjectId,
       ref: "Doctor",
+      required: false, // Es opcional porque el Recepcionista no lo tiene
     },
   },
   { timestamps: true }

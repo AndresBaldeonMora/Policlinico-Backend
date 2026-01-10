@@ -4,6 +4,7 @@ import cors from "cors";
 import pacienteRoutes from "./routes/paciente.routes";
 import especialidadRoutes from "./routes/especialidad.routes";
 import doctorRoutes from "./routes/doctor.routes";
+import medicoRoutes from "./routes/medico.routes"; // ✅ CORRECTO
 import citaRoutes from "./routes/cita.routes";
 import horarioRoutes from "./routes/horario.routes";
 import testRoutes from "./routes/test.routes";
@@ -34,12 +35,15 @@ app.get("/", (_req, res) => {
       citas: "/api/citas",
       horarios: "/api/horarios",
       reniec: "/api/reniec/:dni",
+      medico: "/api/medico",
     },
   });
 });
 
+// ✅ ORDEN CORRECTO: medico ANTES de doctores
 app.use("/api/pacientes", pacienteRoutes);
 app.use("/api/especialidades", especialidadRoutes);
+app.use("/api/medico", medicoRoutes); 
 app.use("/api/doctores", doctorRoutes);
 app.use("/api/citas", citaRoutes);
 app.use("/api/horarios", horarioRoutes);

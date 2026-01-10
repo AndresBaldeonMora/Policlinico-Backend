@@ -1,9 +1,8 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { Usuario } from "../models/Usuario"; // Asegúrate que la ruta sea correcta
+import { Usuario } from "../models/Usuario";
 
-// Tu clave secreta para JWT
 const JWT_SECRET = process.env.JWT_SECRET || "super_secret_change_this";
 
 // --------------------------------------------------
@@ -18,7 +17,7 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Todos los campos son requeridos" });
     }
 
-    // 2. Validar que el ROL sea uno de los permitidos en tu modelo
+    // 2. Validar que el ROL sea uno de los permitidos
     if (rol !== "RECEPCIONISTA" && rol !== "MEDICO") {
       return res.status(400).json({ message: "El rol proporcionado no es válido" });
     }
@@ -29,18 +28,17 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "El correo ya está en uso" });
     }
 
-    // 4. Encriptar la contraseña (Hashing)
+    // 4. Encriptar la contraseña
     const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password, salt); // Usas 'passwordHash' como en tu modelo
+    const passwordHash = await bcrypt.hash(password, salt);
 
     // 5. Crear la instancia del nuevo usuario
     const newUser = new Usuario({
       nombres,
       apellidos,
-      correo: correo.toLowerCase(), // Guardar en minúsculas
-      passwordHash, // Guardamos la versión encriptada
+      correo: correo.toLowerCase(),
+      passwordHash,
       rol,
-      // 'medicoId' es opcional y no se asigna en el registro inicial
     });
 
     // 6. Guardar el usuario en la base de datos
@@ -71,26 +69,25 @@ export const login = async (req: Request, res: Response) => {
     // 1. Buscar al usuario por correo
     const user = await Usuario.findOne({ correo: correo.toLowerCase() });
     if (!user) {
-      return res.status(401).json({ message: "Credenciales inválidas" }); // Correo no encontrado
+      return res.status(401).json({ message: "Credenciales inválidas" });
     }
 
-    // 2. Comparar la contraseña enviada con la guardada (hash)
+    // 2. Comparar la contraseña
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
-      return res.status(401).json({ message: "Credenciales inválidas" }); // Contraseña incorrecta
+      return res.status(401).json({ message: "Credenciales inválidas" });
     }
 
     // 3. Crear el Token (JWT)
     const token = jwt.sign(
       {
-        id: user._id,
+        userId: String(user._id),
         nombres: user.nombres,
         apellidos: user.apellidos,
         rol: user.rol,
-        medicoId: user.medicoId || null,
       },
       JWT_SECRET,
-      { expiresIn: "8h" } // El token expirará en 8 horas
+      { expiresIn: "8h" }
     );
 
     // 4. Enviar la respuesta
@@ -102,7 +99,6 @@ export const login = async (req: Request, res: Response) => {
         apellidos: user.apellidos,
         correo: user.correo,
         rol: user.rol,
-        medicoId: user.medicoId || null,
       },
     });
 
