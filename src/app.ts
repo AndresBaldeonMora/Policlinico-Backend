@@ -43,8 +43,8 @@ app.get("/", (_req, res) => {
 // ✅ ORDEN CORRECTO: medico ANTES de doctores
 app.use("/api/pacientes", pacienteRoutes);
 app.use("/api/especialidades", especialidadRoutes);
-app.use("/api/medico", medicoRoutes); // ← PRIMERO
-app.use("/api/doctores", doctorRoutes); // ← DESPUÉS
+app.use("/api/medico", medicoRoutes); 
+app.use("/api/doctores", doctorRoutes);
 app.use("/api/citas", citaRoutes);
 app.use("/api/horarios", horarioRoutes);
 app.use("/api/test", testRoutes);

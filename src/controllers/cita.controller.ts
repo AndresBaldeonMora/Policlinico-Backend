@@ -26,16 +26,10 @@ const calcularEstado = (fecha: Date, hora: string, estado: string): string => {
   return "PENDIENTE";
 };
 
-/**
- * Función auxiliar para crear un objeto Date en la zona horaria local 
- * a partir de una cadena YYYY-MM-DD.
- * Esto corrige el error de "Invalid Date" y el problema de la zona horaria.
- */
 const crearFechaLocal = (fechaString: string): Date => {
-  const [year, month, day] = fechaString.split('-').map(Number);
-  // month - 1 es crucial porque JavaScript usa meses 0-indexados (Enero=0)
-  return new Date(year, month - 1, day); 
-}
+  const [year, month, day] = fechaString.split("-").map(Number);
+  return new Date(year, month - 1, day);
+};
 
 // ---------------------------------------------------------------
 // 🟢 Crear cita
@@ -200,4 +194,69 @@ export const reprogramarCita = async (req: Request, res: Response) => {
             error: error.message,
         });
     }
+};
+
+export const obtenerCitasCalendario = async (req: Request, res: Response) => {
+  try {
+    const { fecha, vista = "mes", medicoId } = req.query;
+
+    const fechaBase = fecha
+      ? crearFechaLocal(fecha as string)
+      : new Date();
+
+    let fechaInicio: Date;
+    let fechaFin: Date;
+
+    switch (vista) {
+      case "dia":
+        fechaInicio = new Date(fechaBase);
+        fechaInicio.setHours(0, 0, 0, 0);
+        fechaFin = new Date(fechaBase);
+        fechaFin.setHours(23, 59, 59, 999);
+        break;
+
+      case "semana": {
+        const dia = fechaBase.getDay();
+        fechaInicio = new Date(fechaBase);
+        fechaInicio.setDate(fechaBase.getDate() - dia);
+        fechaInicio.setHours(0, 0, 0, 0);
+        fechaFin = new Date(fechaInicio);
+        fechaFin.setDate(fechaInicio.getDate() + 6);
+        fechaFin.setHours(23, 59, 59, 999);
+        break;
+      }
+
+      case "mes":
+      default:
+        fechaInicio = new Date(
+          fechaBase.getFullYear(),
+          fechaBase.getMonth(),
+          1
+        );
+        fechaFin = new Date(
+          fechaBase.getFullYear(),
+          fechaBase.getMonth() + 1,
+          0
+        );
+        fechaFin.setHours(23, 59, 59, 999);
+    }
+
+    const filtro: any = {
+      fecha: { $gte: fechaInicio, $lte: fechaFin },
+    };
+
+    if (medicoId) filtro.doctorId = medicoId;
+
+    const citas = await Cita.find(filtro)
+      .populate("pacienteId", "nombres apellidos dni telefono")
+      .populate("doctorId", "nombres apellidos")
+      .sort({ fecha: 1, hora: 1 });
+
+    res.json({ success: true, data: citas });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };
