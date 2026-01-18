@@ -5,8 +5,7 @@ export interface ICita extends Document {
   doctorId: mongoose.Types.ObjectId;
   fecha: Date;
   hora: string;
-  // ✅ AGREGADO: "REPROGRAMADA" para evitar el error de tipos
-  estado: "PENDIENTE" | "ATENDIDA" | "CANCELADA" | "REPROGRAMADA"; 
+  estado: "PENDIENTE" | "ATENDIDA" | "CANCELADA" | "REPROGRAMADA";
 }
 
 const citaSchema = new Schema<ICita>(
@@ -17,12 +16,14 @@ const citaSchema = new Schema<ICita>(
     hora: { type: String, required: true },
     estado: {
       type: String,
-      // ✅ AGREGADO: "REPROGRAMADA" al enum de la base de datos
-      enum: ["PENDIENTE", "ATENDIDA", "CANCELADA", "REPROGRAMADA"], 
+      enum: ["PENDIENTE", "ATENDIDA", "CANCELADA", "REPROGRAMADA"],
       default: "PENDIENTE",
+      required: true,
     },
   },
   { timestamps: true }
 );
+
+citaSchema.index({ doctorId: 1, fecha: 1, hora: 1 }, { unique: true });
 
 export const Cita = mongoose.model<ICita>("Cita", citaSchema);
