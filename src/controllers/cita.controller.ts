@@ -248,3 +248,38 @@ export const obtenerCitasCalendario = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const obtenerCitaPorId = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const cita = await Cita.findById(id)
+      .populate("pacienteId", "nombres apellidos dni telefono")
+      .populate({
+        path: "doctorId",
+        select: "nombres apellidos especialidadId",
+        populate: {
+          path: "especialidadId",
+          select: "nombre",
+        },
+      });
+
+    if (!cita) {
+      return res.status(404).json({
+        success: false,
+        message: "Cita no encontrada",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: cita,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Error al obtener la cita",
+      error: error.message,
+    });
+  }
+};
