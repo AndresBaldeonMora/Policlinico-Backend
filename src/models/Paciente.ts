@@ -6,9 +6,8 @@ export interface IPaciente extends Document {
   dni: string;
   telefono?: string;
   correo?: string;
-  direccion?: string;
   fechaNacimiento?: Date;
-  edad?: number; // viene del virtual
+  edad?: number; // virtual
 }
 
 const pacienteSchema = new Schema<IPaciente>(
@@ -38,32 +37,29 @@ const pacienteSchema = new Schema<IPaciente>(
       trim: true,
       lowercase: true,
     },
-    direccion: {
-      type: String,
-      trim: true,
-    },
     fechaNacimiento: {
       type: Date,
     },
   },
   {
     timestamps: true,
-    toJSON: { virtuals: true },   // ✅ incluye 'edad' en las respuestas JSON
-    toObject: { virtuals: true }, // ✅ también si se usa .toObject()
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
 
-// ✅ Virtual para calcular edad
-pacienteSchema.virtual("edad").get(function (this: IPaciente) {
+// Virtual edad
+pacienteSchema.virtual("edad").get(function () {
   if (!this.fechaNacimiento) return null;
 
   const hoy = new Date();
-  const fechaNac = new Date(this.fechaNacimiento);
+  const nac = new Date(this.fechaNacimiento);
 
-  let edad = hoy.getFullYear() - fechaNac.getFullYear();
-  const mes = hoy.getMonth() - fechaNac.getMonth();
-
-  if (mes < 0 || (mes === 0 && hoy.getDate() < fechaNac.getDate())) {
+  let edad = hoy.getFullYear() - nac.getFullYear();
+  if (
+    hoy.getMonth() < nac.getMonth() ||
+    (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())
+  ) {
     edad--;
   }
 
