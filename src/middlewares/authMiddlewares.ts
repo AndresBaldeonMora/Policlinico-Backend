@@ -1,10 +1,17 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "super_secret_change_this";
+const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET!;
 
 export interface AuthRequest extends Request {
-  user?: any;
+  user?: {
+    userId: string;
+    correo: string;
+    nombres: string;
+    apellidos: string;
+    rol: string;
+    medicoId?: string;  // Solo presente si el usuario es MEDICO
+  };
 }
 
 export const verifyToken = (
@@ -18,9 +25,23 @@ export const verifyToken = (
   }
 
   const token = authHeader.split(" ")[1];
+
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
+    // Supabase firma sus JWTs con el JWT Secret del proyecto
+    const decoded = jwt.verify(token, SUPABASE_JWT_SECRET) as any;
+
+    // Supabase guarda los metadatos del usuario en user_metadata
+    const meta = decoded.user_metadata ?? {};
+
+    req.user = {
+      userId: decoded.sub,           // sub = UUID del usuario en Supabase
+      correo: decoded.email ?? "",
+      nombres: meta.nombres ?? "",
+      apellidos: meta.apellidos ?? "",
+      rol: meta.rol ?? "",
+      medicoId: meta.medicoId,       // Solo presente si el usuario es MEDICO
+    };
+
     next();
   } catch {
     return res.status(401).json({ message: "Token inválido o expirado" });
