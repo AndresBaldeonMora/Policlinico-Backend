@@ -1,25 +1,25 @@
 import { Request, Response } from "express";
 import { Cita } from "../models/Cita";
 import { Doctor } from "../models/Doctor";
-import { AuthRequest } from "../middlewares/authMiddlewares";
-
-// Helper: extrae medicoId del token de Supabase (viene en user_metadata)
-const getMedicoId = (req: Request): string | null => {
-  return (req as AuthRequest).user?.medicoId ?? null;
-};
+import { Usuario } from "../models/Usuario"; // ✅ Importación necesaria
 
 // ✅ Obtener perfil del médico logueado
 export const obtenerMiPerfil = async (req: Request, res: Response) => {
   try {
-    const medicoId = getMedicoId(req);
-    if (!medicoId) {
-      return res.status(403).json({
+    const { userId } = (req as any).user;
+
+    // 1. Buscamos al usuario para ver qué medicoId tiene
+    const usuario = await Usuario.findById(userId);
+
+    if (!usuario || !usuario.medicoId) {
+      return res.status(404).json({
         success: false,
         message: "Usuario no vinculado a un perfil médico",
       });
     }
 
-    const doctor = await Doctor.findById(medicoId).populate(
+    // 2. Buscamos al Doctor usando el ID que tiene el usuario
+    const doctor = await Doctor.findById(usuario.medicoId).populate(
       "especialidadId",
       "nombre"
     );
@@ -41,12 +41,16 @@ export const obtenerMiPerfil = async (req: Request, res: Response) => {
 // ✅ Obtener todas las citas del médico
 export const obtenerMisCitas = async (req: Request, res: Response) => {
   try {
-    const medicoId = getMedicoId(req);
-    if (!medicoId) {
-      return res.status(403).json({ success: false, message: "No autorizado" });
+    const { userId } = (req as any).user;
+
+    // 1. Obtenemos el ID del doctor a través del usuario
+    const usuario = await Usuario.findById(userId);
+    if (!usuario?.medicoId) {
+      return res.status(404).json({ success: false, message: "No autorizado" });
     }
 
-    const citas = await Cita.find({ doctorId: medicoId })
+    // 2. Buscamos las citas usando doctorId (así se llama en tu modelo Cita)
+    const citas = await Cita.find({ doctorId: usuario.medicoId })
       .populate("pacienteId", "nombres apellidos dni telefono correo")
       .sort({ fecha: -1, hora: 1 });
 
@@ -60,9 +64,11 @@ export const obtenerMisCitas = async (req: Request, res: Response) => {
 // ✅ Obtener citas del día de hoy
 export const obtenerCitasHoy = async (req: Request, res: Response) => {
   try {
-    const medicoId = getMedicoId(req);
-    if (!medicoId) {
-      return res.status(403).json({ success: false, message: "No autorizado" });
+    const { userId } = (req as any).user;
+
+    const usuario = await Usuario.findById(userId);
+    if (!usuario?.medicoId) {
+      return res.status(404).json({ success: false, message: "No autorizado" });
     }
 
     const hoy = new Date();
@@ -72,7 +78,7 @@ export const obtenerCitasHoy = async (req: Request, res: Response) => {
     manana.setDate(manana.getDate() + 1);
 
     const citas = await Cita.find({
-      doctorId: medicoId,
+      doctorId: usuario.medicoId, // ✅ Usamos el ID recuperado del usuario
       fecha: { $gte: hoy, $lt: manana },
     })
       .populate("pacienteId", "nombres apellidos dni telefono correo")
@@ -85,12 +91,13 @@ export const obtenerCitasHoy = async (req: Request, res: Response) => {
   }
 };
 
-// ✅ Actualizar estado de una cita
+// ✅ Actualizar estado de una cita (Se mantiene igual, pero verificamos los strings)
 export const actualizarEstadoCita = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { estado } = req.body;
 
+    // Asegúrate que tu frontend envíe exactamente estos strings
     if (!["PENDIENTE", "ATENDIDA", "CANCELADA"].includes(estado)) {
       return res.status(400).json({
         success: false,
@@ -118,7 +125,7 @@ export const actualizarEstadoCita = async (req: Request, res: Response) => {
   }
 };
 
-// ✅ Obtener detalle de una cita específica
+// ✅ Obtener detalle de una cita específica (Se mantiene igual)
 export const obtenerDetalleCita = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
