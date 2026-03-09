@@ -1,19 +1,56 @@
 import { Request, Response } from "express";
 import { Especialidad } from "../models/Especialidad";
 
-export const listarEspecialidades = async (req: Request, res: Response) => {
+// Listar todas las especialidades
+export const listarEspecialidades = async (_req: Request, res: Response) => {
   try {
-    const especialidades = await Especialidad.find();
-
-    // Mapear para asegurar que devuelve "id"
-    const data = especialidades.map((e: any) => ({
-      id: e._id.toString(), // Convertir ObjectId a string
+    const especialidades = await Especialidad.find().sort({ nombre: 1 });
+    const data = especialidades.map((e) => ({
+      id: e._id.toString(),
       nombre: e.nombre,
-      descripcion: e.descripcion
     }));
-
     res.json({ success: true, data });
-  } catch (error: any) { // Asegura que 'error' sea tratado como 'any'
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Obtener especialidad por ID
+export const obtenerEspecialidad = async (req: Request, res: Response) => {
+  try {
+    const especialidad = await Especialidad.findById(req.params.id);
+    if (!especialidad) {
+      return res.status(404).json({ success: false, message: "Especialidad no encontrada" });
+    }
+    res.json({ success: true, data: { id: especialidad._id.toString(), nombre: especialidad.nombre } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Crear especialidad
+export const crearEspecialidad = async (req: Request, res: Response) => {
+  try {
+    const { nombre } = req.body;
+    if (!nombre?.trim()) {
+      return res.status(400).json({ success: false, message: "El nombre es obligatorio" });
+    }
+    const especialidad = await Especialidad.create({ nombre: nombre.trim() });
+    res.status(201).json({ success: true, data: { id: especialidad._id.toString(), nombre: especialidad.nombre } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Eliminar especialidad
+export const eliminarEspecialidad = async (req: Request, res: Response) => {
+  try {
+    const especialidad = await Especialidad.findByIdAndDelete(req.params.id);
+    if (!especialidad) {
+      return res.status(404).json({ success: false, message: "Especialidad no encontrada" });
+    }
+    res.json({ success: true, message: "Especialidad eliminada" });
+  } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
 };

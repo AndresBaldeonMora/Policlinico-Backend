@@ -3,76 +3,72 @@ import { Cita } from "../models/Cita";
 import { Doctor } from "../models/Doctor";
 import { AuthRequest } from "../middlewares/authMiddlewares";
 
-// Helper: extrae medicoId del token de Supabase (viene en user_metadata)
-const getMedicoId = (req: Request): string | null => {
-  return (req as AuthRequest).user?.medicoId ?? null;
+// Helper: obtiene el doctor vinculado al usuario logueado
+// Primero intenta por medicoId (ObjectId en metadata), luego por supabaseId (UUID)
+const getDoctorId = async (req: Request): Promise<string | null> => {
+  const user = (req as AuthRequest).user;
+  if (!user) return null;
+
+  // Opción A: medicoId en metadata (ObjectId de MongoDB)
+  if (user.medicoId) return user.medicoId;
+
+  // Opción B: buscar por supabaseId (UUID de Supabase)
+  const doctor = await Doctor.findOne({ supabaseId: user.userId }).select("_id");
+  return doctor ? doctor._id.toString() : null;
 };
 
-// ✅ Obtener perfil del médico logueado
+// Obtener perfil del médico logueado
 export const obtenerMiPerfil = async (req: Request, res: Response) => {
   try {
-    const medicoId = getMedicoId(req);
-    if (!medicoId) {
-      return res.status(403).json({
-        success: false,
-        message: "Usuario no vinculado a un perfil médico",
-      });
+    const doctorId = await getDoctorId(req);
+    if (!doctorId) {
+      return res.status(403).json({ success: false, message: "Usuario no vinculado a un perfil médico" });
     }
 
-    const doctor = await Doctor.findById(medicoId).populate(
-      "especialidadId",
-      "nombre"
-    );
-
+    const doctor = await Doctor.findById(doctorId).populate("especialidadId", "nombre");
     if (!doctor) {
-      return res.status(404).json({
-        success: false,
-        message: "Perfil de médico no encontrado",
-      });
+      return res.status(404).json({ success: false, message: "Perfil de médico no encontrado" });
     }
 
     res.json({ success: true, data: doctor });
   } catch (error: any) {
-    console.error("❌ Error al obtener perfil:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ✅ Obtener todas las citas del médico
+// Obtener todas las citas del médico
 export const obtenerMisCitas = async (req: Request, res: Response) => {
   try {
-    const medicoId = getMedicoId(req);
-    if (!medicoId) {
+    const doctorId = await getDoctorId(req);
+    if (!doctorId) {
       return res.status(403).json({ success: false, message: "No autorizado" });
     }
 
-    const citas = await Cita.find({ doctorId: medicoId })
+    const citas = await Cita.find({ doctorId })
       .populate("pacienteId", "nombres apellidos dni telefono correo")
       .sort({ fecha: -1, hora: 1 });
 
     res.json({ success: true, data: citas });
   } catch (error: any) {
-    console.error("❌ Error al obtener citas:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ✅ Obtener citas del día de hoy
+// Obtener citas del día de hoy
 export const obtenerCitasHoy = async (req: Request, res: Response) => {
   try {
-    const medicoId = getMedicoId(req);
-    if (!medicoId) {
+    const doctorId = await getDoctorId(req);
+    if (!doctorId) {
       return res.status(403).json({ success: false, message: "No autorizado" });
     }
 
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
-
     const manana = new Date(hoy);
     manana.setDate(manana.getDate() + 1);
 
     const citas = await Cita.find({
-      doctorId: medicoId,
+      doctorId,
       fecha: { $gte: hoy, $lt: manana },
     })
       .populate("pacienteId", "nombres apellidos dni telefono correo")
@@ -80,22 +76,18 @@ export const obtenerCitasHoy = async (req: Request, res: Response) => {
 
     res.json({ success: true, data: citas });
   } catch (error: any) {
-    console.error("❌ Error al obtener citas de hoy:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ✅ Actualizar estado de una cita
+// Actualizar estado de una cita
 export const actualizarEstadoCita = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { estado } = req.body;
 
     if (!["PENDIENTE", "ATENDIDA", "CANCELADA"].includes(estado)) {
-      return res.status(400).json({
-        success: false,
-        message: "Estado inválido",
-      });
+      return res.status(400).json({ success: false, message: "Estado inválido" });
     }
 
     const cita = await Cita.findByIdAndUpdate(
@@ -105,39 +97,29 @@ export const actualizarEstadoCita = async (req: Request, res: Response) => {
     ).populate("pacienteId", "nombres apellidos dni telefono");
 
     if (!cita) {
-      return res.status(404).json({
-        success: false,
-        message: "Cita no encontrada",
-      });
+      return res.status(404).json({ success: false, message: "Cita no encontrada" });
     }
 
     res.json({ success: true, data: cita });
   } catch (error: any) {
-    console.error("❌ Error al actualizar estado:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ✅ Obtener detalle de una cita específica
+// Obtener detalle de una cita
 export const obtenerDetalleCita = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-
-    const cita = await Cita.findById(id).populate(
+    const cita = await Cita.findById(req.params.id).populate(
       "pacienteId",
       "nombres apellidos dni telefono correo direccion fechaNacimiento"
     );
 
     if (!cita) {
-      return res.status(404).json({
-        success: false,
-        message: "Cita no encontrada",
-      });
+      return res.status(404).json({ success: false, message: "Cita no encontrada" });
     }
 
     res.json({ success: true, data: cita });
   } catch (error: any) {
-    console.error("❌ Error al obtener detalle de cita:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
