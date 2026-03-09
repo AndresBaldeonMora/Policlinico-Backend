@@ -7,43 +7,40 @@ export interface IPaciente extends Document {
   telefono?: string;
   correo?: string;
   fechaNacimiento?: Date;
+  sexo?: string;
+  estadoCivil?: string;
+  direccion?: string;
+  distrito?: string;
+  apoderadoNombre?: string;
+  apoderadoParentesco?: string;
+  apoderadoTelefono?: string;
   edad?: number; // virtual
 }
 
 const pacienteSchema = new Schema<IPaciente>(
   {
-    nombres: {
+    nombres:    { type: String, required: true, trim: true },
+    apellidos:  { type: String, required: true, trim: true },
+    dni:        { type: String, required: true, unique: true, trim: true },
+    telefono:   { type: String, trim: true },
+    correo:     { type: String, trim: true, lowercase: true },
+    fechaNacimiento: { type: Date },
+    sexo:       { type: String, enum: ["M", "F", ""], default: "" },
+    estadoCivil: {
       type: String,
-      required: true,
-      trim: true,
+      enum: ["SOLTERO", "CASADO", "CONVIVIENTE", "DIVORCIADO", "VIUDO", ""],
+      default: "",
     },
-    apellidos: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    dni: {
-      type: String,
-      required: true,
-      unique: true,
-      trim: true,
-    },
-    telefono: {
-      type: String,
-      trim: true,
-    },
-    correo: {
-      type: String,
-      trim: true,
-      lowercase: true,
-    },
-    fechaNacimiento: {
-      type: Date,
-    },
+    direccion:  { type: String, trim: true, default: "" },
+    distrito:   { type: String, trim: true, default: "" },
+    // Apoderado (solo menores de edad)
+    apoderadoNombre:      { type: String, trim: true, default: "" },
+    apoderadoParentesco:  { type: String, trim: true, default: "" },
+    apoderadoTelefono:    { type: String, trim: true, default: "" },
   },
   {
     timestamps: true,
-    toJSON: { virtuals: true },
+    toJSON:   { virtuals: true },
     toObject: { virtuals: true },
   }
 );
@@ -51,18 +48,13 @@ const pacienteSchema = new Schema<IPaciente>(
 // Virtual edad
 pacienteSchema.virtual("edad").get(function () {
   if (!this.fechaNacimiento) return null;
-
   const hoy = new Date();
   const nac = new Date(this.fechaNacimiento);
-
   let edad = hoy.getFullYear() - nac.getFullYear();
   if (
     hoy.getMonth() < nac.getMonth() ||
     (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())
-  ) {
-    edad--;
-  }
-
+  ) edad--;
   return edad;
 });
 

@@ -32,10 +32,7 @@ export const obtenerPaciente = async (req: Request, res: Response) => {
   try {
     const paciente = await Paciente.findById(req.params.id);
     if (!paciente) {
-      return res.status(404).json({
-        success: false,
-        message: "Paciente no encontrado",
-      });
+      return res.status(404).json({ success: false, message: "Paciente no encontrado" });
     }
     res.json({ success: true, data: paciente });
   } catch (error: any) {
@@ -47,29 +44,31 @@ export const obtenerPaciente = async (req: Request, res: Response) => {
 // 🟠 Buscar paciente por DNI
 export const buscarPacientePorDni = async (req: Request, res: Response) => {
   try {
-    const { dni } = req.params;
-
-    // Si tienes virtual edad configurado en el schema:
-    // PacienteSchema.set('toJSON', { virtuals: true });
-    // entonces esto ya incluirá edad.
-    const paciente: any = await Paciente.findOne({ dni });
-
+    const paciente = await Paciente.findOne({ dni: req.params.dni });
     if (!paciente) {
-      return res.status(404).json({
-        success: false,
-        message: "No se encontró ningún paciente con ese DNI",
-      });
+      return res.status(404).json({ success: false, message: "No se encontró ningún paciente con ese DNI" });
     }
-
-    res.json({
-      success: true,
-      data: paciente,
-    });
+    res.json({ success: true, data: paciente });
   } catch (error: any) {
     console.error("❌ Error al buscar paciente por DNI:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 🟡 Actualizar paciente por ID
+export const actualizarPaciente = async (req: Request, res: Response) => {
+  try {
+    const paciente = await Paciente.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+    if (!paciente) {
+      return res.status(404).json({ success: false, message: "Paciente no encontrado" });
+    }
+    res.json({ success: true, message: "Paciente actualizado correctamente", data: paciente });
+  } catch (error: any) {
+    console.error("❌ Error al actualizar paciente:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
