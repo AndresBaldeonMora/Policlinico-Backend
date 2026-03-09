@@ -3,9 +3,10 @@ import { Cita } from "../models/Cita";
 import { Paciente } from "../models/Paciente";
 import { Doctor } from "../models/Doctor";
 
-const crearFechaLocal = (fechaString: string): Date => {
+// ✅ Crea fecha en UTC puro para evitar desfase de zona horaria
+const crearFechaUTC = (fechaString: string): Date => {
   const [year, month, day] = fechaString.split("-").map(Number);
-  return new Date(year, month - 1, day);
+  return new Date(Date.UTC(year, month - 1, day));
 };
 
 const calcularEstado = (fecha: Date, hora: string, estado: string): string => {
@@ -16,7 +17,7 @@ const calcularEstado = (fecha: Date, hora: string, estado: string): string => {
   const ahora = new Date();
   const fechaHoraCita = new Date(fecha);
   const [horas, minutos] = hora.split(":").map(Number);
-  fechaHoraCita.setHours(horas, minutos, 0, 0);
+  fechaHoraCita.setUTCHours(horas, minutos, 0, 0);
 
   const diferenciaMin = (ahora.getTime() - fechaHoraCita.getTime()) / (1000 * 60);
   if (diferenciaMin > 30) return "ATENDIDA";
@@ -28,10 +29,7 @@ export const crearCita = async (req: Request, res: Response) => {
     const { pacienteId, doctorId, fecha, hora } = req.body;
 
     if (!pacienteId || !doctorId || !fecha || !hora) {
-      return res.status(400).json({
-        success: false,
-        message: "Todos los campos son requeridos",
-      });
+      return res.status(400).json({ success: false, message: "Todos los campos son requeridos" });
     }
 
     const [pacienteExiste, doctorExiste] = await Promise.all([
@@ -39,55 +37,25 @@ export const crearCita = async (req: Request, res: Response) => {
       Doctor.exists({ _id: doctorId }),
     ]);
 
-    if (!pacienteExiste) {
-      return res.status(400).json({ success: false, message: "Paciente inválido o no existe" });
-    }
-    if (!doctorExiste) {
-      return res.status(400).json({ success: false, message: "Doctor inválido o no existe" });
-    }
+    if (!pacienteExiste) return res.status(400).json({ success: false, message: "Paciente inválido o no existe" });
+    if (!doctorExiste)   return res.status(400).json({ success: false, message: "Doctor inválido o no existe" });
 
-    const fechaInicioDia = crearFechaLocal(fecha);
-    if (isNaN(fechaInicioDia.getTime())) {
-      return res.status(400).json({
-        success: false,
-        message: "Formato de fecha inválido proporcionado",
-      });
+    const fechaUTC = crearFechaUTC(fecha);
+    if (isNaN(fechaUTC.getTime())) {
+      return res.status(400).json({ success: false, message: "Formato de fecha inválido" });
     }
 
-    const citaExistente = await Cita.findOne({
-      doctorId,
-      fecha: fechaInicioDia,
-      hora,
-    });
-
+    const citaExistente = await Cita.findOne({ doctorId, fecha: fechaUTC, hora });
     if (citaExistente) {
-      return res.status(400).json({
-        success: false,
-        message: "Ya existe una cita para ese horario",
-      });
+      return res.status(400).json({ success: false, message: "Ya existe una cita para ese horario" });
     }
 
-    const nuevaCita = new Cita({
-      pacienteId,
-      doctorId,
-      fecha: fechaInicioDia,
-      hora,
-      estado: "PENDIENTE",
-    });
-
+    const nuevaCita = new Cita({ pacienteId, doctorId, fecha: fechaUTC, hora, estado: "PENDIENTE" });
     await nuevaCita.save();
 
-    res.status(201).json({
-      success: true,
-      data: nuevaCita,
-      message: "Cita creada exitosamente",
-    });
+    res.status(201).json({ success: true, data: nuevaCita, message: "Cita creada exitosamente" });
   } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: "Error al crear la cita",
-      error: error.message,
-    });
+    res.status(500).json({ success: false, message: "Error al crear la cita", error: error.message });
   }
 };
 
@@ -98,46 +66,35 @@ export const listarCitas = async (_req: Request, res: Response) => {
       .populate({
         path: "doctorId",
         select: "nombres apellidos especialidadId",
-        populate: {
-          path: "especialidadId",
-          select: "nombre",
-        },
+        populate: { path: "especialidadId", select: "nombre" },
       })
       .sort({ _id: -1 });
 
     const citasProcesadas = citas.map((cita, index) => {
       const paciente = cita.pacienteId as any;
-      const doctor = cita.doctorId as any;
+      const doctor   = cita.doctorId as any;
 
       const fechaFormateada = new Date(cita.fecha).toLocaleDateString("es-PE", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
+        day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC",
       });
-
-      const estadoActual = calcularEstado(cita.fecha, cita.hora, cita.estado);
 
       return {
         id: index + 1,
         _id: cita._id,
         dni: paciente?.dni || "—",
         paciente: `${paciente?.nombres || ""} ${paciente?.apellidos || ""}`.trim(),
-        doctor: doctor ? `${doctor?.nombres || ""} ${doctor?.apellidos || ""}`.trim() : "Sin asignar",
+        doctor: doctor ? `${doctor.nombres || ""} ${doctor.apellidos || ""}`.trim() : "Sin asignar",
         doctorId: doctor?._id || "",
         especialidad: doctor?.especialidadId?.nombre || "Sin especialidad",
         fecha: fechaFormateada,
         hora: cita.hora,
-        estado: estadoActual,
+        estado: calcularEstado(cita.fecha, cita.hora, cita.estado),
       };
     });
 
     res.json({ success: true, data: citasProcesadas });
   } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: "Error al listar citas",
-      error: error.message,
-    });
+    res.status(500).json({ success: false, message: "Error al listar citas", error: error.message });
   }
 };
 
@@ -147,52 +104,32 @@ export const reprogramarCita = async (req: Request, res: Response) => {
     const { fecha, hora } = req.body;
 
     const cita = await Cita.findById(id);
-    if (!cita) {
-      return res.status(404).json({
-        success: false,
-        message: "Cita no encontrada",
-      });
-    }
+    if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
 
-    const fechaInicioDia = crearFechaLocal(fecha);
-    if (isNaN(fechaInicioDia.getTime())) {
-      return res.status(400).json({
-        success: false,
-        message: "Formato de nueva fecha inválido",
-      });
+    const fechaUTC = crearFechaUTC(fecha);
+    if (isNaN(fechaUTC.getTime())) {
+      return res.status(400).json({ success: false, message: "Formato de nueva fecha inválido" });
     }
 
     const citaExistente = await Cita.findOne({
       _id: { $ne: id },
       doctorId: cita.doctorId,
-      fecha: fechaInicioDia,
+      fecha: fechaUTC,
       hora,
     });
 
     if (citaExistente) {
-      return res.status(400).json({
-        success: false,
-        message: "Ya existe una cita para ese horario",
-      });
+      return res.status(400).json({ success: false, message: "Ya existe una cita para ese horario" });
     }
 
-    cita.fecha = fechaInicioDia;
-    cita.hora = hora;
+    cita.fecha  = fechaUTC;
+    cita.hora   = hora;
     cita.estado = "REPROGRAMADA";
-
     await cita.save();
 
-    res.json({
-      success: true,
-      data: cita,
-      message: "Cita reprogramada exitosamente",
-    });
+    res.json({ success: true, data: cita, message: "Cita reprogramada exitosamente" });
   } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: "Error al reprogramar cita",
-      error: error.message,
-    });
+    res.status(500).json({ success: false, message: "Error al reprogramar cita", error: error.message });
   }
 };
 
@@ -200,36 +137,35 @@ export const obtenerCitasCalendario = async (req: Request, res: Response) => {
   try {
     const { fecha, vista = "mes", medicoId } = req.query;
 
-    const fechaBase = fecha ? crearFechaLocal(fecha as string) : new Date();
+    // ✅ Parsear fecha en UTC para evitar desfase
+    const [y, m, d] = ((fecha as string) || "").split("-").map(Number);
+    const fechaBase = fecha
+      ? new Date(Date.UTC(y, m - 1, d))
+      : new Date();
 
     let fechaInicio: Date;
     let fechaFin: Date;
 
     switch (vista) {
       case "dia":
-        fechaInicio = new Date(fechaBase);
-        fechaInicio.setHours(0, 0, 0, 0);
-        fechaFin = new Date(fechaBase);
-        fechaFin.setHours(23, 59, 59, 999);
+        fechaInicio = new Date(Date.UTC(fechaBase.getUTCFullYear(), fechaBase.getUTCMonth(), fechaBase.getUTCDate(), 0, 0, 0));
+        fechaFin    = new Date(Date.UTC(fechaBase.getUTCFullYear(), fechaBase.getUTCMonth(), fechaBase.getUTCDate(), 23, 59, 59, 999));
         break;
 
       case "semana": {
-        const offset = (fechaBase.getDay() + 6) % 7;
-        fechaInicio = new Date(fechaBase);
-        fechaInicio.setDate(fechaBase.getDate() - offset);
-        fechaInicio.setHours(0, 0, 0, 0);
-        fechaFin = new Date(fechaInicio);
-        fechaFin.setDate(fechaInicio.getDate() + 6);
-        fechaFin.setHours(23, 59, 59, 999);
+        const dow = fechaBase.getUTCDay(); // 0=dom,...,6=sab
+        const offset = (dow + 6) % 7;     // lunes=0
+        fechaInicio = new Date(Date.UTC(fechaBase.getUTCFullYear(), fechaBase.getUTCMonth(), fechaBase.getUTCDate() - offset, 0, 0, 0));
+        fechaFin    = new Date(fechaInicio);
+        fechaFin.setUTCDate(fechaInicio.getUTCDate() + 6);
+        fechaFin.setUTCHours(23, 59, 59, 999);
         break;
       }
 
       case "mes":
       default:
-        fechaInicio = new Date(fechaBase.getFullYear(), fechaBase.getMonth(), 1);
-        fechaInicio.setHours(0, 0, 0, 0);
-        fechaFin = new Date(fechaBase.getFullYear(), fechaBase.getMonth() + 1, 0);
-        fechaFin.setHours(23, 59, 59, 999);
+        fechaInicio = new Date(Date.UTC(fechaBase.getUTCFullYear(), fechaBase.getUTCMonth(), 1, 0, 0, 0));
+        fechaFin    = new Date(Date.UTC(fechaBase.getUTCFullYear(), fechaBase.getUTCMonth() + 1, 0, 23, 59, 59, 999));
     }
 
     const filtro: any = { fecha: { $gte: fechaInicio, $lte: fechaFin } };
@@ -242,44 +178,24 @@ export const obtenerCitasCalendario = async (req: Request, res: Response) => {
 
     res.json({ success: true, data: citas });
   } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
 export const obtenerCitaPorId = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-
-    const cita = await Cita.findById(id)
+    const cita = await Cita.findById(req.params.id)
       .populate("pacienteId", "nombres apellidos dni telefono")
       .populate({
         path: "doctorId",
         select: "nombres apellidos especialidadId",
-        populate: {
-          path: "especialidadId",
-          select: "nombre",
-        },
+        populate: { path: "especialidadId", select: "nombre" },
       });
 
-    if (!cita) {
-      return res.status(404).json({
-        success: false,
-        message: "Cita no encontrada",
-      });
-    }
+    if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
 
-    res.json({
-      success: true,
-      data: cita,
-    });
+    res.json({ success: true, data: cita });
   } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: "Error al obtener la cita",
-      error: error.message,
-    });
+    res.status(500).json({ success: false, message: "Error al obtener la cita", error: error.message });
   }
 };
