@@ -199,3 +199,23 @@ export const obtenerCitaPorId = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: "Error al obtener la cita", error: error.message });
   }
 };
+
+export const cancelarCita = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const cita = await Cita.findById(id);
+    if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
+
+    if (cita.estado === "CANCELADA") {
+      return res.status(400).json({ success: false, message: "La cita ya está cancelada" });
+    }
+
+    cita.estado = "CANCELADA";
+    await cita.save();
+
+    res.json({ success: true, message: "Cita cancelada correctamente" });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: "Error al cancelar la cita", error: error.message });
+  }
+};
