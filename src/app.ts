@@ -8,6 +8,7 @@ import medicoRoutes from "./routes/medico.routes"; // ✅ CORRECTO
 import citaRoutes from "./routes/cita.routes";
 import horarioRoutes from "./routes/horario.routes";
 import testRoutes from "./routes/test.routes";
+import authRoutes from "./routes/auth.routes";
 import reniecRoutes from "./routes/reniec.routes";
 import { errorHandler } from "./middlewares/errorHandler";
 
@@ -47,6 +48,7 @@ app.use("/api/doctores", doctorRoutes);
 app.use("/api/citas", citaRoutes);
 app.use("/api/horarios", horarioRoutes);
 app.use("/api/test", testRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/api/reniec", reniecRoutes);
 
 app.use(errorHandler);

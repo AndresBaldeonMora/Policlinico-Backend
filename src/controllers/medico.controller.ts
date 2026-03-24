@@ -3,21 +3,16 @@ import { Cita } from "../models/Cita";
 import { Doctor } from "../models/Doctor";
 import { AuthRequest } from "../middlewares/authMiddlewares";
 
-// Helper: obtiene el doctor vinculado al usuario logueado
-// Primero intenta por medicoId (ObjectId en metadata), luego por supabaseId (UUID)
 const getDoctorId = async (req: Request): Promise<string | null> => {
   const user = (req as AuthRequest).user;
   if (!user) return null;
 
-  // Opción A: medicoId en metadata (ObjectId de MongoDB)
   if (user.medicoId) return user.medicoId;
 
-  // Opción B: buscar por supabaseId (UUID de Supabase)
   const doctor = await Doctor.findOne({ supabaseId: user.userId }).select("_id");
   return doctor ? doctor._id.toString() : null;
 };
 
-// Obtener perfil del médico logueado
 export const obtenerMiPerfil = async (req: Request, res: Response) => {
   try {
     const doctorId = await getDoctorId(req);
@@ -36,7 +31,6 @@ export const obtenerMiPerfil = async (req: Request, res: Response) => {
   }
 };
 
-// Obtener todas las citas del médico
 export const obtenerMisCitas = async (req: Request, res: Response) => {
   try {
     const doctorId = await getDoctorId(req);
@@ -54,7 +48,6 @@ export const obtenerMisCitas = async (req: Request, res: Response) => {
   }
 };
 
-// Obtener citas del día de hoy
 export const obtenerCitasHoy = async (req: Request, res: Response) => {
   try {
     const doctorId = await getDoctorId(req);
@@ -80,7 +73,6 @@ export const obtenerCitasHoy = async (req: Request, res: Response) => {
   }
 };
 
-// Actualizar estado de una cita
 export const actualizarEstadoCita = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -106,7 +98,6 @@ export const actualizarEstadoCita = async (req: Request, res: Response) => {
   }
 };
 
-// Obtener detalle de una cita
 export const obtenerDetalleCita = async (req: Request, res: Response) => {
   try {
     const cita = await Cita.findById(req.params.id).populate(
