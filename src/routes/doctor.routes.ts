@@ -10,11 +10,15 @@ import {
 
 const router = Router();
 
-router.get("/",                                    listarDoctores);
-router.get("/:id",                                 obtenerDoctor);
-router.post("/",                                   crearDoctor);
-router.put("/:id",                                 actualizarDoctor);
-router.get("/especialidad/:especialidadId",         obtenerDoctoresPorEspecialidad);
-router.get("/:id/horarios-disponibles",            obtenerHorariosDisponibles);
+router.get("/",                                       listarDoctores);
+router.post("/",                                      crearDoctor);
+
+// ⚠️ Rutas estáticas ANTES que las dinámicas (:id)
+router.get("/especialidad/:especialidadId",            obtenerDoctoresPorEspecialidad);
+
+// Rutas dinámicas después
+router.get("/:id",                                    obtenerDoctor);
+router.put("/:id",                                    actualizarDoctor);
+router.get("/:id/horarios-disponibles",               obtenerHorariosDisponibles);
 
 export default router;
