@@ -1,54 +1,59 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+dotenv.config();
+
 import { Especialidad } from "../models/Especialidad";
 import { Doctor } from "../models/Doctor";
 
-dotenv.config();
-
-const MONGO_URL = process.env.MONGO_URL || "mongodb://localhost:27017/policlinico";
-
-const especialidadesData = [
-  { nombre: "Pediatría", descripcion: "Atención médica para niños y adolescentes" },
-  { nombre: "Cardiología", descripcion: "Tratamiento de enfermedades del corazón" },
-  { nombre: "Dermatología", descripcion: "Tratamiento de afecciones de la piel" }
+const especialidades = [
+  { nombre: "Medicina General" },
+  { nombre: "Pediatría" },
+  { nombre: "Cardiología" },
+  { nombre: "Dermatología" },
+  { nombre: "Ginecología" },
+  { nombre: "Traumatología" },
+  { nombre: "Oftalmología" },
+  { nombre: "Odontología" },
 ];
 
-const doctoresData = [
-  { nombres: "María", apellidos: "González", correo: "maria@policlinico.com", telefono: "987654321", especialidad: "Pediatría" },
-  { nombres: "Luis", apellidos: "Ramírez", correo: "luis@policlinico.com", telefono: "987123456", especialidad: "Cardiología" },
-  { nombres: "Ana", apellidos: "Torres", correo: "ana@policlinico.com", telefono: "999888777", especialidad: "Dermatología" }
-];
-
-
-const seedDatabase = async () => {
-  await Doctor.collection.dropIndexes().catch(() => {});
+async function seed() {
   try {
-    await mongoose.connect(MONGO_URL);
-    console.log("✅ Conectado a MongoDB para carga inicial");
+    await mongoose.connect(process.env.MONGODB_URI!);
+    console.log("✅ Conectado a MongoDB");
 
+    // Limpiar colecciones
     await Especialidad.deleteMany({});
     await Doctor.deleteMany({});
+    console.log("🗑️  Colecciones limpiadas");
 
-    const especialidades = await Especialidad.insertMany(especialidadesData);
-    console.log("🌱 Especialidades creadas:", especialidades.length);
+    // Crear especialidades
+    const especialidadesCreadas = await Especialidad.insertMany(especialidades);
+    console.log(`✅ ${especialidadesCreadas.length} especialidades creadas`);
 
-    const especialidadMap: Record<string, mongoose.Types.ObjectId> = {};
-    especialidades.forEach(e => (especialidadMap[e.nombre] = e._id as mongoose.Types.ObjectId));
+    // Crear doctores de ejemplo
+    const medGen  = especialidadesCreadas.find(e => e.nombre === "Medicina General")?._id;
+    const pediatr = especialidadesCreadas.find(e => e.nombre === "Pediatría")?._id;
+    const cardiol = especialidadesCreadas.find(e => e.nombre === "Cardiología")?._id;
 
-    const doctores = doctoresData.map(d => ({
-      ...d,
-      especialidadId: especialidadMap[d.especialidad]
-    }));
+    const doctores = [
+      { nombres: "Jasmen",  apellidos: "Sajian",  correo: "jasmen@sanjose.com",  telefono: "999888777", especialidadId: medGen,  cmp: "99999" },
+      { nombres: "Carlos",  apellidos: "Ríos",    correo: "carlos@sanjose.com",  telefono: "988777666", especialidadId: pediatr, cmp: "88888" },
+      { nombres: "María",   apellidos: "Torres",  correo: "maria@sanjose.com",   telefono: "977666555", especialidadId: cardiol, cmp: "77777" },
+    ];
 
-    await Doctor.insertMany(doctores);
-    console.log("👩‍⚕️ Doctores creados:", doctores.length);
+    const doctoresCreados = await Doctor.insertMany(doctores);
+    console.log(`✅ ${doctoresCreados.length} doctores creados`);
 
-    console.log("✅ Carga inicial completada correctamente");
+    console.log("\n📋 IDs para configurar en Supabase user_metadata:");
+    doctoresCreados.forEach(d => {
+      console.log(`  ${d.nombres} ${d.apellidos}: medicoId = "${d._id}"`);
+    });
+
     process.exit(0);
   } catch (error) {
-    console.error("❌ Error al sembrar datos:", error);
+    console.error("❌ Error en seed:", error);
     process.exit(1);
   }
-};
+}
 
-seedDatabase();
+seed();

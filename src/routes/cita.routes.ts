@@ -7,7 +7,9 @@ import {
   reprogramarCita,
   obtenerCitasCalendario,
     obtenerCitaPorId,
+    cancelarCita
 } from "../controllers/cita.controller";
+
 
 const router = express.Router();
 
@@ -17,6 +19,7 @@ router.post("/", crearCita);
 router.get("/", listarCitas);
 router.get("/:id", obtenerCitaPorId);
 router.put("/:id/reprogramar", reprogramarCita);
+router.put("/:id/cancelar", cancelarCita);
 
 
 export default router;
