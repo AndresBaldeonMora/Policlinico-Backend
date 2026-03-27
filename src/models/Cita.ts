@@ -6,6 +6,7 @@ export interface ICita extends Document {
   fecha: Date;
   hora: string;
   estado: "PENDIENTE" | "ATENDIDA" | "CANCELADA" | "REPROGRAMADA";
+  notas?: string;
 
   // Preparado para pagos (NO obligatorio por ahora)
   pago?: {
@@ -45,6 +46,11 @@ const citaSchema = new Schema<ICita>(
       enum: ["PENDIENTE", "ATENDIDA", "CANCELADA", "REPROGRAMADA"],
       default: "PENDIENTE",
       required: true,
+    },
+
+    notas: {
+      type: String,
+      default: "",
     },
 
     // 🔒 Campo de pago (opcional por ahora)

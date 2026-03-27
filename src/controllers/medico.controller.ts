@@ -76,15 +76,20 @@ export const obtenerCitasHoy = async (req: Request, res: Response) => {
 export const actualizarEstadoCita = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { estado } = req.body;
+    const { estado, notas } = req.body;
 
     if (!["PENDIENTE", "ATENDIDA", "CANCELADA"].includes(estado)) {
       return res.status(400).json({ success: false, message: "Estado inválido" });
     }
 
+    const updateData: Record<string, unknown> = { estado };
+    if (notas !== undefined) {
+      updateData.notas = notas;
+    }
+
     const cita = await Cita.findByIdAndUpdate(
       id,
-      { estado },
+      updateData,
       { new: true }
     ).populate("pacienteId", "nombres apellidos dni telefono");
 
