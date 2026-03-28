@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
-import { Cita } from "../models/Cita";
+import { isValidObjectId } from "mongoose";
+import { Cita, type ICita } from "../models/Cita";
 import { Paciente } from "../models/Paciente";
 import { Doctor } from "../models/Doctor";
 
@@ -185,7 +186,7 @@ export const obtenerCitasCalendario = async (req: Request, res: Response) => {
 export const obtenerCitaPorId = async (req: Request, res: Response) => {
   try {
     const cita = await Cita.findById(req.params.id)
-      .populate("pacienteId", "nombres apellidos dni telefono")
+      .populate("pacienteId", "nombres apellidos dni telefono correo fechaNacimiento")
       .populate({
         path: "doctorId",
         select: "nombres apellidos especialidadId",
@@ -197,6 +198,56 @@ export const obtenerCitaPorId = async (req: Request, res: Response) => {
     res.json({ success: true, data: cita });
   } catch (error: any) {
     res.status(500).json({ success: false, message: "Error al obtener la cita", error: error.message });
+  }
+};
+
+const TRANSICIONES_PERMITIDAS: Record<string, string[]> = {
+  PENDIENTE:    ["ATENDIDA", "CANCELADA"],
+  REPROGRAMADA: ["ATENDIDA", "CANCELADA"],
+  ATENDIDA:     [],
+  CANCELADA:    [],
+};
+
+export const cambiarEstadoCita = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { estado } = req.body as { estado?: string };
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "ID de cita inválido" });
+    }
+
+    const estadosPermitidos = Object.values(TRANSICIONES_PERMITIDAS).flat();
+    const estadosUnicos = [...new Set(estadosPermitidos)];
+    if (!estado || !estadosUnicos.includes(estado)) {
+      return res.status(400).json({
+        success: false,
+        message: `Estado inválido. Valores permitidos: ${estadosUnicos.join(", ")}`,
+      });
+    }
+
+    const cita = await Cita.findById(id);
+    if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
+
+    if (cita.estado === estado) {
+      return res.status(400).json({ success: false, message: `La cita ya está en estado ${estado}` });
+    }
+
+    const transiciones = TRANSICIONES_PERMITIDAS[cita.estado];
+    if (!transiciones || !transiciones.includes(estado)) {
+      return res.status(400).json({
+        success: false,
+        message: `No se puede cambiar de ${cita.estado} a ${estado}`,
+      });
+    }
+
+    cita.estado = estado as ICita["estado"];
+    await cita.save();
+
+    res.json({ success: true, data: cita, message: `Cita marcada como ${estado}` });
+  } catch (error: any) {
+    console.error("Error al cambiar estado:", error);
+    res.status(500).json({ success: false, message: "Error al cambiar estado de la cita" });
   }
 };
 

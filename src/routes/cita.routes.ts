@@ -6,10 +6,11 @@ import {
   listarCitas,
   reprogramarCita,
   obtenerCitasCalendario,
-    obtenerCitaPorId,
-    cancelarCita
+  obtenerCitaPorId,
+  cancelarCita,
+  cambiarEstadoCita,
 } from "../controllers/cita.controller";
-
+import { verifyToken, requireRole } from "../middlewares/authMiddlewares";
 
 const router = express.Router();
 
@@ -20,6 +21,7 @@ router.get("/", listarCitas);
 router.get("/:id", obtenerCitaPorId);
 router.put("/:id/reprogramar", reprogramarCita);
 router.put("/:id/cancelar", cancelarCita);
+router.patch("/:id/estado", verifyToken, requireRole(["RECEPCIONISTA", "MEDICO"]), cambiarEstadoCita);
 
 
 export default router;
