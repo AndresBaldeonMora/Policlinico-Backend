@@ -22,23 +22,33 @@ export const verifyToken = async (
 
   const token = authHeader.split(" ")[1];
 
-  const { data: { user }, error } = await supabase.auth.getUser(token);
-
-  if (error || !user) {
-    return res.status(401).json({ message: "Token inválido o expirado" });
+  // Intentar primero con JWT propio del backend
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    return next();
+  } catch {
+    // Si falla, intentar con token de Supabase
   }
 
-  const meta = user.user_metadata ?? {};
-  req.user = {
-    userId: user.id,
-    correo: user.email,
-    nombres: meta.nombres,
-    apellidos: meta.apellidos,
-    rol: meta.rol,
-    medicoId: meta.medicoId,
-  };
+  // Intentar decodificar token de Supabase (firmado con ES256)
+  try {
+    const decoded: any = jwt.decode(token);
+    if (decoded?.iss?.includes("supabase") && decoded.user_metadata) {
+      req.user = {
+        userId: decoded.sub,
+        nombres: decoded.user_metadata?.nombres,
+        apellidos: decoded.user_metadata?.apellidos,
+        rol: decoded.user_metadata?.rol,
+        medicoId: decoded.user_metadata?.medicoId,
+      };
+      return next();
+    }
+  } catch {
+    // Token no decodificable
+  }
 
-  next();
+  return res.status(401).json({ message: "Token inválido o expirado" });
 };
 
 export const requireRole = (roles: string[]) => {

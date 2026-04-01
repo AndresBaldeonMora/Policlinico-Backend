@@ -1,7 +1,10 @@
 import { Request, Response } from "express";
 import { ExamenLaboratorio } from "../models/ExamenLaboratorio";
 import { OrdenExamen } from "../models/OrdenExamen";
+import { Cita } from "../models/Cita";
+import { Usuario } from "../models/Usuario";
 import mongoose from "mongoose";
+import { AuthRequest } from "../middlewares/authMiddlewares";
 
 // ─────────────────────────────────────────────────────────────
 // CATÁLOGO DE EXÁMENES
@@ -76,20 +79,50 @@ export const eliminarExamen = async (req: Request, res: Response) => {
 // ÓRDENES DE EXAMEN
 // ─────────────────────────────────────────────────────────────
 
-export const crearOrden = async (req: Request, res: Response) => {
+export const crearOrden = async (req: AuthRequest, res: Response) => {
   try {
-    const { pacienteId, doctorId, citaId, especialidadId, items, observacionesGenerales } = req.body;
+    const { pacienteId, citaId, especialidadId, items, observacionesGenerales } = req.body;
 
-    if (!pacienteId || !doctorId || !especialidadId || !items?.length) {
+    if (!pacienteId || !especialidadId || !items?.length) {
       return res.status(400).json({
         success: false,
-        message: "pacienteId, doctorId, especialidadId e items son obligatorios",
+        message: "pacienteId, especialidadId e items son obligatorios",
       });
+    }
+
+    // Obtener el medicoId del usuario autenticado
+    let medicoId = req.user?.medicoId;
+    if (!medicoId) {
+      const usuario = await Usuario.findById(req.user?.userId);
+      if (!usuario?.medicoId) {
+        return res.status(403).json({
+          success: false,
+          message: "Tu usuario no está vinculado a un doctor",
+        });
+      }
+      medicoId = String(usuario.medicoId);
+    }
+
+    // Si se proporciona citaId, verificar que el doctor autenticado sea el asignado a la cita
+    if (citaId) {
+      const cita = await Cita.findById(citaId);
+      if (!cita) {
+        return res.status(404).json({
+          success: false,
+          message: "La cita especificada no existe",
+        });
+      }
+      if (String(cita.doctorId) !== medicoId) {
+        return res.status(403).json({
+          success: false,
+          message: "No tienes permiso para crear órdenes en esta cita. Solo el doctor asignado puede hacerlo.",
+        });
+      }
     }
 
     const orden = await OrdenExamen.create({
       pacienteId,
-      doctorId,
+      doctorId: medicoId,
       citaId: citaId || undefined,
       especialidadId,
       items: items.map((item: any) => ({
