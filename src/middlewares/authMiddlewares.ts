@@ -1,13 +1,16 @@
 import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
+import { createClient } from "@supabase/supabase-js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "super_secret_change_this";
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_ANON_KEY!
+);
 
 export interface AuthRequest extends Request {
   user?: any;
 }
 
-export const verifyToken = (
+export const verifyToken = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction
