@@ -85,6 +85,7 @@ export const login = async (req: Request, res: Response) => {
         nombres: user.nombres,
         apellidos: user.apellidos,
         rol: user.rol,
+        medicoId: user.medicoId ? String(user.medicoId) : undefined,
       },
       JWT_SECRET,
       { expiresIn: "8h" }

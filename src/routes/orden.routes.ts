@@ -8,11 +8,12 @@ import {
   cargarResultados,
   cancelarOrden,
 } from "../controllers/examen.controller";
+import { verifyToken, requireRole } from "../middlewares/authMiddlewares";
 
 const router = Router();
 
-// Órdenes de examen
-router.post("/",                          crearOrden);
+// Órdenes de examen (solo MEDICO puede crear)
+router.post("/", verifyToken, requireRole(["MEDICO"]), crearOrden);
 router.get("/pendientes",                 listarOrdenesPendientes);
 router.get("/paciente/:pacienteId",       listarOrdenesPorPaciente);
 router.get("/cita/:citaId",               listarOrdenesPorCita);
