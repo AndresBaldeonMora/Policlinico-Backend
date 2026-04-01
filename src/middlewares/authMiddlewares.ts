@@ -1,13 +1,16 @@
 import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
+import { createClient } from "@supabase/supabase-js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "super_secret_change_this";
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_ANON_KEY!
+);
 
 export interface AuthRequest extends Request {
   user?: any;
 }
 
-export const verifyToken = (
+export const verifyToken = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction
@@ -18,13 +21,24 @@ export const verifyToken = (
   }
 
   const token = authHeader.split(" ")[1];
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch {
+
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+
+  if (error || !user) {
     return res.status(401).json({ message: "Token inválido o expirado" });
   }
+
+  const meta = user.user_metadata ?? {};
+  req.user = {
+    userId: user.id,
+    correo: user.email,
+    nombres: meta.nombres,
+    apellidos: meta.apellidos,
+    rol: meta.rol,
+    medicoId: meta.medicoId,
+  };
+
+  next();
 };
 
 export const requireRole = (roles: string[]) => {
