@@ -3,11 +3,10 @@ import { createClient } from "@supabase/supabase-js";
 import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret";
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_ANON_KEY!
-);
+// const supabase = createClient(
+//   process.env.SUPABASE_URL!,
+//   process.env.SUPABASE_ANON_KEY!
+// );
 
 export interface AuthRequest extends Request {
   user?: any;

@@ -258,3 +258,41 @@ export const listarOrdenesPendientes = async (_req: Request, res: Response) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// ── Edición de orden (solo PENDIENTE, solo el médico creador) ──
+export const actualizarOrden = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { items, observacionesGenerales } = req.body;
+    const medicoId = req.user?.medicoId;
+
+    const orden = await OrdenExamen.findById(id);
+    if (!orden) return res.status(404).json({ success: false, message: "Orden no encontrada" });
+
+    if (medicoId && orden.doctorId.toString() !== medicoId) {
+      return res.status(403).json({ success: false, message: "No tienes permisos para editar esta orden" });
+    }
+
+    if (orden.estado !== "PENDIENTE") {
+      return res.status(400).json({ success: false, message: "Solo se pueden editar órdenes en estado PENDIENTE" });
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, message: "Debe incluir al menos un ítem en la orden" });
+    }
+
+    orden.items = items;
+    if (observacionesGenerales !== undefined) orden.observacionesGenerales = observacionesGenerales;
+    await orden.save();
+
+    const ordenActualizada = await OrdenExamen.findById(id)
+      .populate("pacienteId", "nombres apellidos dni")
+      .populate("doctorId", "nombres apellidos")
+      .populate("especialidadId", "nombre")
+      .populate("items.examenId", "nombre tipo unidad referenciaMin referenciaMax referenciaTexto");
+
+    res.json({ success: true, data: ordenActualizada });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
