@@ -12,6 +12,7 @@ import authRoutes from "./routes/auth.routes";
 import reniecRoutes from "./routes/reniec.routes";
 import examenRoutes from "./routes/examen.routes";
 import ordenRoutes from "./routes/orden.routes";
+import reportesRoutes from "./routes/reportes.routes";
 import { errorHandler } from "./middlewares/errorHandler";
 
 const app = express();
@@ -40,6 +41,7 @@ app.get("/", (_req, res) => {
       medico: "/api/medico",
       examenes: "/api/examenes",
       ordenes: "/api/ordenes",
+      reportes: "/api/reportes",
     },
   });
 });
@@ -56,6 +58,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/reniec", reniecRoutes);
 app.use("/api/examenes", examenRoutes);
 app.use("/api/ordenes", ordenRoutes);
+app.use("/api/reportes", reportesRoutes);
 
 app.use(errorHandler);
 

@@ -15,8 +15,8 @@ const doctorSchema = new Schema<IDoctor>(
   {
     nombres:        { type: String, required: true, trim: true },
     apellidos:      { type: String, required: true, trim: true },
-    correo:         { type: String, required: true, trim: true, lowercase: true },
-    telefono:       { type: String, required: true, trim: true },
+    correo:         { type: String, required: true, trim: true, lowercase: true, unique: true },
+    telefono:       { type: String, required: true, trim: true, unique: true },
     especialidadId: { type: Schema.Types.ObjectId, ref: "Especialidad", required: true },
     cmp:            { type: String, trim: true, default: "" },
     supabaseId:     { type: String, trim: true, default: "" },
