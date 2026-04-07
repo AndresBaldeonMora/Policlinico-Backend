@@ -7,13 +7,14 @@ import {
   obtenerOrden,
   cargarResultados,
   cancelarOrden,
+  actualizarOrden,
 } from "../controllers/examen.controller";
 import { verifyToken, requireRole } from "../middlewares/authMiddlewares";
 import { AuditLog } from "../models/AuditLog";
 const router = Router();
 
 // Órdenes de examen (solo MEDICO puede crear)
-router.post("/", verifyToken, requireRole(["MEDICO"]), crearOrden);
+router.post("/",                          verifyToken, requireRole(["MEDICO"]), crearOrden);
 router.get("/pendientes",                 listarOrdenesPendientes);
 router.get("/audit-logs", async (_req, res) => {  // ← antes de /:id
   try {
@@ -28,5 +29,6 @@ router.get("/cita/:citaId",               listarOrdenesPorCita);
 router.get("/:id",                        obtenerOrden);
 router.patch("/:id/resultados",           cargarResultados);
 router.patch("/:id/cancelar",             cancelarOrden);
+router.patch("/:id",                      verifyToken, requireRole(["MEDICO"]), actualizarOrden);
 
 export default router;

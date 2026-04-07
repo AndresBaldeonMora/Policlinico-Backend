@@ -3,7 +3,6 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret";
-
 // const supabase = createClient(
 //   process.env.SUPABASE_URL!,
 //   process.env.SUPABASE_ANON_KEY!
