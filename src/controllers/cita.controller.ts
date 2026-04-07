@@ -9,21 +9,6 @@ const crearFechaUTC = (fechaString: string): Date => {
   return new Date(Date.UTC(year, month - 1, day));
 };
 
-const calcularEstado = (fecha: Date, hora: string, estado: string): string => {
-  if (estado === "REPROGRAMADA") return "REPROGRAMADA";
-  if (estado === "ATENDIDA") return "ATENDIDA";
-  if (estado === "CANCELADA") return "CANCELADA";
-
-  const ahora = new Date();
-  const fechaHoraCita = new Date(fecha);
-  const [horas, minutos] = hora.split(":").map(Number);
-  fechaHoraCita.setUTCHours(horas, minutos, 0, 0);
-
-  const diferenciaMin = (ahora.getTime() - fechaHoraCita.getTime()) / (1000 * 60);
-  if (diferenciaMin > 30) return "ATENDIDA";
-  return "PENDIENTE";
-};
-
 export const crearCita = async (req: Request, res: Response) => {
   try {
     const { pacienteId, doctorId, fecha, hora } = req.body;
@@ -88,7 +73,7 @@ export const listarCitas = async (_req: Request, res: Response) => {
         especialidad: doctor?.especialidadId?.nombre || "Sin especialidad",
         fecha: fechaFormateada,
         hora: cita.hora,
-        estado: calcularEstado(cita.fecha, cita.hora, cita.estado),
+        estado: cita.estado,
       };
     });
 

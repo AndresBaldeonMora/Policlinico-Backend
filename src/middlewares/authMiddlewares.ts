@@ -1,13 +1,19 @@
 import { Request, Response, NextFunction } from "express";
+import { createClient } from "@supabase/supabase-js";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "super_secret_change_this";
+const JWT_SECRET = process.env.JWT_SECRET || "secret";
+
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_ANON_KEY!
+);
 
 export interface AuthRequest extends Request {
   user?: any;
 }
 
-export const verifyToken = (
+export const verifyToken = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction
@@ -18,13 +24,34 @@ export const verifyToken = (
   }
 
   const token = authHeader.split(" ")[1];
+
+  // Intentar primero con JWT propio del backend
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
-    next();
+    return next();
   } catch {
-    return res.status(401).json({ message: "Token inválido o expirado" });
+    // Si falla, intentar con token de Supabase
   }
+
+  // Intentar decodificar token de Supabase (firmado con ES256)
+  try {
+    const decoded: any = jwt.decode(token);
+    if (decoded?.iss?.includes("supabase") && decoded.user_metadata) {
+      req.user = {
+        userId: decoded.sub,
+        nombres: decoded.user_metadata?.nombres,
+        apellidos: decoded.user_metadata?.apellidos,
+        rol: decoded.user_metadata?.rol,
+        medicoId: decoded.user_metadata?.medicoId,
+      };
+      return next();
+    }
+  } catch {
+    // Token no decodificable
+  }
+
+  return res.status(401).json({ message: "Token inválido o expirado" });
 };
 
 export const requireRole = (roles: string[]) => {

@@ -7,6 +7,7 @@
     "dev": "nodemon --exec ts-node src/index.ts",
     "dev:clean": "rm -rf dist node_modules/.cache && nodemon --exec ts-node src/index.ts",
     "seed": "ts-node src/config/seed.ts",
+    "seed:examenes": "ts-node src/config/seedExamenes.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },
@@ -19,6 +20,7 @@
   "author": "Victor Rodríguez",
   "license": "ISC",
   "dependencies": {
+    "@supabase/supabase-js": "^2.101.1",
     "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",

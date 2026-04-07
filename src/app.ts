@@ -10,6 +10,8 @@ import horarioRoutes from "./routes/horario.routes";
 import testRoutes from "./routes/test.routes";
 import authRoutes from "./routes/auth.routes";
 import reniecRoutes from "./routes/reniec.routes";
+import examenRoutes from "./routes/examen.routes";
+import ordenRoutes from "./routes/orden.routes";
 import { errorHandler } from "./middlewares/errorHandler";
 
 const app = express();
@@ -36,6 +38,8 @@ app.get("/", (_req, res) => {
       horarios: "/api/horarios",
       reniec: "/api/reniec/:dni",
       medico: "/api/medico",
+      examenes: "/api/examenes",
+      ordenes: "/api/ordenes",
     },
   });
 });
@@ -50,6 +54,8 @@ app.use("/api/horarios", horarioRoutes);
 app.use("/api/test", testRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/reniec", reniecRoutes);
+app.use("/api/examenes", examenRoutes);
+app.use("/api/ordenes", ordenRoutes);
 
 app.use(errorHandler);
 
