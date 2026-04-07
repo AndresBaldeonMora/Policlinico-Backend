@@ -1,10 +1,35 @@
 import { Request, Response } from "express";
 import { ExamenLaboratorio } from "../models/ExamenLaboratorio";
+import { AuditLog } from "../models/AuditLog";
 import { OrdenExamen } from "../models/OrdenExamen";
 import { Cita } from "../models/Cita";
 import { Usuario } from "../models/Usuario";
 import mongoose from "mongoose";
 import { AuthRequest } from "../middlewares/authMiddlewares";
+
+// ─────────────────────────────────────────────────────────────
+// AUDIT LOG
+// ─────────────────────────────────────────────────────────────
+const registrarAudit = async (
+  usuarioId: string,
+  accion: string,
+  entidadId: string,
+  detalles: object,
+  ipAddress?: string
+) => {
+  try {
+    await AuditLog.create({
+      usuarioId,
+      accion,
+      entidad: "OrdenExamen",
+      entidadId,
+      detalles,
+      ipAddress,
+    });
+  } catch (error) {
+    console.error("Error al registrar audit log:", error);
+  }
+};
 
 // ─────────────────────────────────────────────────────────────
 // CATÁLOGO DE EXÁMENES
@@ -140,6 +165,13 @@ export const crearOrden = async (req: AuthRequest, res: Response) => {
       .populate("items.examenId", "nombre tipo unidad");
 
     res.status(201).json({ success: true, data: ordenPoblada });
+    await registrarAudit(
+      req.user?.userId ?? "desconocido",
+      "crear_orden",
+      String(orden._id),
+      { pacienteId, citaId, especialidadId, items },
+      req.ip
+    );
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -225,6 +257,13 @@ export const cargarResultados = async (req: Request, res: Response) => {
       .populate("items.examenId", "nombre tipo unidad referenciaMin referenciaMax referenciaTexto");
 
     res.json({ success: true, data: ordenActualizada });
+    await registrarAudit(
+      (req as AuthRequest).user?.userId ?? "desconocido",
+      "cargar_resultados",
+      id,
+      { resultados, estadoFinal: orden.estado },
+      req.ip
+    );
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -239,6 +278,13 @@ export const cancelarOrden = async (req: Request, res: Response) => {
     );
     if (!orden) return res.status(404).json({ success: false, message: "Orden no encontrada" });
     res.json({ success: true, message: "Orden cancelada" });
+    await registrarAudit(
+      (req as AuthRequest).user?.userId ?? "desconocido",
+      "cancelar_orden",
+      String(req.params.id),
+      { estadoNuevo: "CANCELADA" },
+      req.ip
+    );
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

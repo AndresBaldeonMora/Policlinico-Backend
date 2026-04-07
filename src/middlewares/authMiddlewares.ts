@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { createClient } from "@supabase/supabase-js";
+//import { createClient } from "@supabase/supabase-js";
 import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret";
@@ -36,14 +36,29 @@ export const verifyToken = async (
   // Intentar decodificar token de Supabase (firmado con ES256)
   try {
     const decoded: any = jwt.decode(token);
-    if (decoded?.iss?.includes("supabase") && decoded.user_metadata) {
+    // if (decoded?.iss?.includes("supabase") && decoded.user_metadata) {
+    //   req.user = {
+    //     userId: decoded.sub,
+    //     nombres: decoded.user_metadata?.nombres,
+    //     apellidos: decoded.user_metadata?.apellidos,
+    //     rol: decoded.user_metadata?.rol,
+    //     medicoId: decoded.user_metadata?.medicoId,
+    //   };
+    //   return next();
+    // }
+    if (decoded?.iss?.includes("supabase")) {
+      const meta = decoded.user_metadata ?? {};
+      const appMeta = decoded.app_metadata ?? {};
+
       req.user = {
-        userId: decoded.sub,
-        nombres: decoded.user_metadata?.nombres,
-        apellidos: decoded.user_metadata?.apellidos,
-        rol: decoded.user_metadata?.rol,
-        medicoId: decoded.user_metadata?.medicoId,
+        userId:    decoded.sub,
+        email:     decoded.email,
+        nombres:   meta.nombres,
+        apellidos: meta.apellidos,
+        rol:       (appMeta.role ?? meta.rol ?? "").toLowerCase(), // ← ADMINISTRADOR → administrador
+        medicoId:  meta.medicoId,
       };
+
       return next();
     }
   } catch {

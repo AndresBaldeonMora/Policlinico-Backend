@@ -4,6 +4,7 @@ import {
   obtenerDoctor,
   crearDoctor,
   actualizarDoctor,
+  eliminarDoctor,
   obtenerDoctoresPorEspecialidad,
   obtenerHorariosDisponibles,
 } from "../controllers/doctor.controller";
@@ -18,7 +19,8 @@ router.get("/especialidad/:especialidadId",            obtenerDoctoresPorEspecia
 
 // Rutas dinámicas después
 router.get("/:id",                                    obtenerDoctor);
-router.put("/:id",                                    actualizarDoctor);
+router.patch("/:id",                                    actualizarDoctor);
+router.delete("/:id",                                 eliminarDoctor);
 router.get("/:id/horarios-disponibles",               obtenerHorariosDisponibles);
 
 export default router;

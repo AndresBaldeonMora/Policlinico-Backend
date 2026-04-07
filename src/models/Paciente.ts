@@ -22,8 +22,8 @@ const pacienteSchema = new Schema<IPaciente>(
     nombres:    { type: String, required: true, trim: true },
     apellidos:  { type: String, required: true, trim: true },
     dni:        { type: String, required: true, unique: true, trim: true },
-    telefono:   { type: String, trim: true },
-    correo:     { type: String, trim: true, lowercase: true },
+    telefono: { type: String, trim: true, unique: true, sparse: true },
+    correo:   { type: String, trim: true, lowercase: true, unique: true, sparse: true },
     fechaNacimiento: { type: Date },
     sexo:       { type: String, enum: ["M", "F", ""], default: "" },
     estadoCivil: {
