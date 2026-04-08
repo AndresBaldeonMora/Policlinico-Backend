@@ -16,8 +16,12 @@ export interface IOrdenExamen extends Document {
   doctorId: mongoose.Types.ObjectId;
   citaId?: mongoose.Types.ObjectId;
   especialidadId: mongoose.Types.ObjectId;
+  codigoOrden: string;
+  fechaVencimiento: Date;
+  citaLabId?: mongoose.Types.ObjectId;
+  motivoVencimiento?: string;
   items: IItemOrden[];
-  estado: "PENDIENTE" | "EN_PROCESO" | "COMPLETADO" | "CANCELADA";
+  estado: "PENDIENTE" | "EN_PROCESO" | "COMPLETADO" | "CANCELADA" | "VENCIDA";
   observacionesGenerales?: string;
   fecha: Date;
 }
@@ -44,10 +48,14 @@ const ordenExamenSchema = new Schema<IOrdenExamen>(
     doctorId:   { type: Schema.Types.ObjectId, ref: "Doctor",   required: true },
     citaId:     { type: Schema.Types.ObjectId, ref: "Cita" },
     especialidadId: { type: Schema.Types.ObjectId, ref: "Especialidad", required: true },
+    codigoOrden: { type: String, unique: true, sparse: true },
+    fechaVencimiento: { type: Date },
+    citaLabId: { type: Schema.Types.ObjectId, ref: "Cita" },
+    motivoVencimiento: { type: String, trim: true },
     items: [itemOrdenSchema],
     estado: {
       type: String,
-      enum: ["PENDIENTE", "EN_PROCESO", "COMPLETADO", "CANCELADA"],
+      enum: ["PENDIENTE", "EN_PROCESO", "COMPLETADO", "CANCELADA", "VENCIDA"],
       default: "PENDIENTE",
       required: true,
     },

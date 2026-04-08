@@ -4,10 +4,14 @@ import {
   listarOrdenesPorPaciente,
   listarOrdenesPorCita,
   listarOrdenesPendientes,
+  listarOrdenesSinCitaLab,
   obtenerOrden,
+  obtenerOrdenParaImprimir,
+  buscarOrdenPorCodigo,
   cargarResultados,
   cancelarOrden,
   actualizarOrden,
+  generarCitaLab,
 } from "../controllers/examen.controller";
 import { verifyToken, requireRole } from "../middlewares/authMiddlewares";
 import { AuditLog } from "../models/AuditLog";
@@ -16,7 +20,9 @@ const router = Router();
 // Órdenes de examen (solo MEDICO puede crear)
 router.post("/",                          verifyToken, requireRole(["MEDICO"]), crearOrden);
 router.get("/pendientes",                 listarOrdenesPendientes);
-router.get("/audit-logs", async (_req, res) => {  // ← antes de /:id
+router.get("/sin-cita-lab",               listarOrdenesSinCitaLab);
+router.get("/buscar",                     buscarOrdenPorCodigo);
+router.get("/audit-logs", async (_req, res) => {
   try {
     const logs = await AuditLog.find().sort({ timestamp: -1 }).limit(20);
     res.json({ success: true, data: logs });
@@ -27,6 +33,8 @@ router.get("/audit-logs", async (_req, res) => {  // ← antes de /:id
 router.get("/paciente/:pacienteId",       listarOrdenesPorPaciente);
 router.get("/cita/:citaId",               listarOrdenesPorCita);
 router.get("/:id",                        obtenerOrden);
+router.get("/:id/imprimir",               obtenerOrdenParaImprimir);
+router.patch("/:id/generar-cita-lab",     generarCitaLab);
 router.patch("/:id/resultados",           cargarResultados);
 router.patch("/:id/cancelar",             cancelarOrden);
 router.patch("/:id",                      verifyToken, requireRole(["MEDICO"]), actualizarOrden);

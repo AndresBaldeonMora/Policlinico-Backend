@@ -1,10 +1,13 @@
 import mongoose, { Schema, Document } from "mongoose";
 
+export type TipoCita = "CONSULTA" | "LABORATORIO" | "REMOTA" | "DOMICILIO";
+
 export interface ICita extends Document {
   pacienteId: mongoose.Types.ObjectId;
   doctorId: mongoose.Types.ObjectId;
   fecha: Date;
   hora: string;
+  tipo: TipoCita;
   estado: "PENDIENTE" | "ATENDIDA" | "CANCELADA" | "REPROGRAMADA";
 
   // Preparado para pagos (NO obligatorio por ahora)
@@ -37,6 +40,13 @@ const citaSchema = new Schema<ICita>(
 
     hora: {
       type: String,
+      required: true,
+    },
+
+    tipo: {
+      type: String,
+      enum: ["CONSULTA", "LABORATORIO", "REMOTA", "DOMICILIO"],
+      default: "CONSULTA",
       required: true,
     },
 

@@ -3,9 +3,11 @@ import { ExamenLaboratorio } from "../models/ExamenLaboratorio";
 import { AuditLog } from "../models/AuditLog";
 import { OrdenExamen } from "../models/OrdenExamen";
 import { Cita } from "../models/Cita";
+import { Doctor } from "../models/Doctor";
 import { Usuario } from "../models/Usuario";
 import mongoose from "mongoose";
 import { AuthRequest } from "../middlewares/authMiddlewares";
+import { generarCodigoOrden } from "../utils/generarCodigoOrden";
 
 // ─────────────────────────────────────────────────────────────
 // AUDIT LOG
@@ -14,8 +16,9 @@ const registrarAudit = async (
   usuarioId: string,
   accion: string,
   entidadId: string,
-  detalles: object,
-  ipAddress?: string
+  detalles: Record<string, unknown>,
+  ipAddress?: string,
+  extra?: { estadoAnterior?: string; estadoNuevo?: string; usuarioNombre?: string; descripcion?: string }
 ) => {
   try {
     await AuditLog.create({
@@ -25,6 +28,7 @@ const registrarAudit = async (
       entidadId,
       detalles,
       ipAddress,
+      ...extra,
     });
   } catch (error) {
     console.error("Error al registrar audit log:", error);
@@ -145,11 +149,18 @@ export const crearOrden = async (req: AuthRequest, res: Response) => {
       }
     }
 
+    // Auto-generar código de orden y fecha de vencimiento (30 días)
+    const codigoOrden = await generarCodigoOrden();
+    const fechaVencimiento = new Date();
+    fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
+
     const orden = await OrdenExamen.create({
       pacienteId,
       doctorId: medicoId,
       citaId: citaId || undefined,
       especialidadId,
+      codigoOrden,
+      fechaVencimiento,
       items: items.map((item: any) => ({
         examenId: item.examenId,
         observaciones: item.observaciones || "",
@@ -300,6 +311,148 @@ export const listarOrdenesPendientes = async (_req: Request, res: Response) => {
       .populate("items.examenId", "nombre tipo unidad")
       .sort({ fecha: -1 });
     res.json({ success: true, data: ordenes });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── Generar cita de laboratorio desde una orden ──
+export const generarCitaLab = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { fecha, hora, doctorId } = req.body;
+
+    if (!fecha || !hora || !doctorId) {
+      return res.status(400).json({ success: false, message: "fecha, hora y doctorId son requeridos" });
+    }
+
+    const orden = await OrdenExamen.findById(id);
+    if (!orden) return res.status(404).json({ success: false, message: "Orden no encontrada" });
+
+    if (orden.citaLabId) {
+      return res.status(400).json({ success: false, message: "Esta orden ya tiene una cita de laboratorio generada" });
+    }
+
+    if (orden.estado === "VENCIDA" || orden.estado === "CANCELADA") {
+      return res.status(400).json({ success: false, message: `No se puede generar cita para una orden en estado ${orden.estado}` });
+    }
+
+    // Verificar que el doctor existe
+    const doctor = await Doctor.findById(doctorId);
+    if (!doctor) return res.status(404).json({ success: false, message: "Doctor de laboratorio no encontrado" });
+
+    // Crear fecha UTC
+    const [year, month, day] = fecha.split("-").map(Number);
+    const fechaUTC = new Date(Date.UTC(year, month - 1, day));
+
+    // Verificar que no haya conflicto de horario
+    const citaExistente = await Cita.findOne({ doctorId, fecha: fechaUTC, hora });
+    if (citaExistente) {
+      return res.status(400).json({ success: false, message: "Ya existe una cita para ese horario" });
+    }
+
+    // Crear cita tipo LABORATORIO
+    const citaLab = await Cita.create({
+      pacienteId: orden.pacienteId,
+      doctorId,
+      fecha: fechaUTC,
+      hora,
+      tipo: "LABORATORIO",
+      estado: "PENDIENTE",
+    });
+
+    // Actualizar orden con citaLabId y cambiar estado a EN_PROCESO
+    orden.citaLabId = citaLab._id as mongoose.Types.ObjectId;
+    orden.estado = "EN_PROCESO";
+    await orden.save();
+
+    // Registrar en AuditLog
+    await registrarAudit(
+      req.user?.userId ?? "desconocido",
+      "generar_cita_lab",
+      String(orden._id),
+      { citaLabId: citaLab._id, fecha, hora, doctorId },
+      req.ip,
+      { estadoAnterior: "PENDIENTE", estadoNuevo: "EN_PROCESO" }
+    );
+
+    const ordenActualizada = await OrdenExamen.findById(id)
+      .populate("pacienteId", "nombres apellidos dni")
+      .populate("doctorId", "nombres apellidos")
+      .populate("especialidadId", "nombre")
+      .populate("items.examenId", "nombre tipo unidad");
+
+    res.json({ success: true, data: ordenActualizada, citaLab });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── Buscar orden por código ──
+export const buscarOrdenPorCodigo = async (req: Request, res: Response) => {
+  try {
+    const { codigo } = req.query;
+    if (!codigo) return res.status(400).json({ success: false, message: "El parámetro codigo es requerido" });
+
+    const orden = await OrdenExamen.findOne({ codigoOrden: codigo as string })
+      .populate("pacienteId", "nombres apellidos dni fechaNacimiento sexo")
+      .populate("doctorId", "nombres apellidos cmp")
+      .populate("especialidadId", "nombre")
+      .populate("items.examenId", "nombre tipo unidad referenciaMin referenciaMax referenciaTexto");
+
+    if (!orden) return res.status(404).json({ success: false, message: "No se encontró orden con ese código" });
+
+    res.json({ success: true, data: orden });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── Órdenes pendientes sin cita de laboratorio generada ──
+export const listarOrdenesSinCitaLab = async (_req: Request, res: Response) => {
+  try {
+    const ordenes = await OrdenExamen.find({
+      estado: "PENDIENTE",
+      citaLabId: null,
+    })
+      .populate("pacienteId", "nombres apellidos dni")
+      .populate("doctorId", "nombres apellidos")
+      .populate("especialidadId", "nombre")
+      .populate("items.examenId", "nombre tipo unidad")
+      .sort({ fechaVencimiento: 1 });
+
+    res.json({ success: true, data: ordenes });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── Datos para impresión de orden ──
+export const obtenerOrdenParaImprimir = async (req: Request, res: Response) => {
+  try {
+    const orden = await OrdenExamen.findById(req.params.id)
+      .populate("pacienteId", "nombres apellidos dni fechaNacimiento sexo")
+      .populate({
+        path: "doctorId",
+        select: "nombres apellidos cmp especialidadId",
+        populate: { path: "especialidadId", select: "nombre" },
+      })
+      .populate("especialidadId", "nombre")
+      .populate("items.examenId", "nombre tipo unidad referenciaMin referenciaMax referenciaTexto descripcion");
+
+    if (!orden) return res.status(404).json({ success: false, message: "Orden no encontrada" });
+
+    res.json({
+      success: true,
+      data: {
+        orden,
+        policlinico: {
+          nombre: "Policlínico Parroquial San José",
+          direccion: "Lima, Perú",
+          telefono: "",
+        },
+      },
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

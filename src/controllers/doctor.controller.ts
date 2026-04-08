@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { Doctor } from "../models/Doctor";
 import { Cita } from "../models/Cita";
+import { BloqueoHorario } from "../models/BloqueoHorario";
 
 // ─── Validaciones ─────────────────────────────────────────
 const soloLetras = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/;
@@ -162,6 +163,22 @@ export const obtenerHorariosDisponibles = async (req: Request, res: Response) =>
     fechaInicio.setHours(0, 0, 0, 0);
     const fechaFin = new Date(fecha as string);
     fechaFin.setHours(23, 59, 59, 999);
+
+    // Verificar si el día está bloqueado
+    const bloqueoActivo = await BloqueoHorario.findOne({
+      doctorId: id,
+      fecha: { $gte: fechaInicio, $lte: fechaFin },
+      activo: true,
+    });
+
+    if (bloqueoActivo) {
+      const horariosDisponibles = horariosBase.map((hora) => ({
+        hora,
+        disponible: false,
+        diaBloqueado: true,
+      }));
+      return res.json({ success: true, data: horariosDisponibles, diaBloqueado: true, motivoBloqueo: bloqueoActivo.motivo });
+    }
 
     const citasAgendadas = await Cita.find({
       doctorId: id,
