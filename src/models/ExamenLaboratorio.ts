@@ -16,27 +16,23 @@ export interface IExamenLaboratorio extends Document {
   nombre: string;
   tipo: TipoExamen;
   descripcion?: string;
-  unidad?: string;
-  referenciaMin?: number;
-  referenciaMax?: number;
-  referenciaTexto?: string;
+  instrucciones: string;   // Indicaciones para el paciente (ayuno, horario, preparación)
+  validezDias: number;     // Días de validez de la cita de lab generada (default 7)
   activo: boolean;
 }
 
 const examenLaboratorioSchema = new Schema<IExamenLaboratorio>(
   {
-    nombre:           { type: String, required: true, trim: true },
+    nombre:        { type: String, required: true, trim: true },
     tipo: {
       type: String,
       enum: ["HEMATOLOGIA", "BIOQUIMICA", "ORINA", "HECES", "MICROBIOLOGIA", "INMUNOLOGIA", "HORMONAS", "IMAGEN", "OTRO"],
       required: true,
     },
-    descripcion:      { type: String, trim: true, default: "" },
-    unidad:           { type: String, trim: true, default: "" },
-    referenciaMin:    { type: Number },
-    referenciaMax:    { type: Number },
-    referenciaTexto:  { type: String, trim: true, default: "" },
-    activo:           { type: Boolean, default: true },
+    descripcion:   { type: String, trim: true, default: "" },
+    instrucciones: { type: String, trim: true, default: "" },
+    validezDias:   { type: Number, default: 7, min: 1 },
+    activo:        { type: Boolean, default: true },
   },
   { timestamps: true }
 );

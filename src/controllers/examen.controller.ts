@@ -3,7 +3,6 @@ import { ExamenLaboratorio } from "../models/ExamenLaboratorio";
 import { AuditLog } from "../models/AuditLog";
 import { OrdenExamen } from "../models/OrdenExamen";
 import { Cita } from "../models/Cita";
-import { Doctor } from "../models/Doctor";
 import { Usuario } from "../models/Usuario";
 import mongoose from "mongoose";
 import { AuthRequest } from "../middlewares/authMiddlewares";
@@ -65,7 +64,7 @@ export const obtenerExamen = async (req: Request, res: Response) => {
 
 export const crearExamen = async (req: Request, res: Response) => {
   try {
-    const { nombre, tipo, descripcion, unidad, referenciaMin, referenciaMax, referenciaTexto } = req.body;
+    const { nombre, tipo, descripcion, instrucciones, validezDias } = req.body;
     if (!nombre?.trim() || !tipo) {
       return res.status(400).json({ success: false, message: "nombre y tipo son obligatorios" });
     }
@@ -73,10 +72,8 @@ export const crearExamen = async (req: Request, res: Response) => {
       nombre: nombre.trim(),
       tipo,
       descripcion,
-      unidad,
-      referenciaMin,
-      referenciaMax,
-      referenciaTexto,
+      instrucciones,
+      validezDias,
     });
     res.status(201).json({ success: true, data: examen });
   } catch (error: any) {
@@ -173,7 +170,7 @@ export const crearOrden = async (req: AuthRequest, res: Response) => {
       .populate("pacienteId", "nombres apellidos dni")
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo unidad");
+      .populate("items.examenId", "nombre tipo");
 
     res.status(201).json({ success: true, data: ordenPoblada });
     await registrarAudit(
@@ -194,7 +191,7 @@ export const listarOrdenesPorPaciente = async (req: Request, res: Response) => {
     const ordenes = await OrdenExamen.find({ pacienteId })
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo unidad")
+      .populate("items.examenId", "nombre tipo")
       .sort({ fecha: -1 });
     res.json({ success: true, data: ordenes });
   } catch (error: any) {
@@ -209,7 +206,7 @@ export const listarOrdenesPorCita = async (req: Request, res: Response) => {
       .populate("pacienteId", "nombres apellidos dni")
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo unidad");
+      .populate("items.examenId", "nombre tipo");
     res.json({ success: true, data: ordenes });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
@@ -222,7 +219,7 @@ export const obtenerOrden = async (req: Request, res: Response) => {
       .populate("pacienteId", "nombres apellidos dni fechaNacimiento sexo")
       .populate("doctorId", "nombres apellidos cmp")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo unidad referenciaMin referenciaMax referenciaTexto");
+      .populate("items.examenId", "nombre tipo instrucciones");
     if (!orden) return res.status(404).json({ success: false, message: "Orden no encontrada" });
     res.json({ success: true, data: orden });
   } catch (error: any) {
@@ -265,7 +262,7 @@ export const cargarResultados = async (req: Request, res: Response) => {
       .populate("pacienteId", "nombres apellidos dni")
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo unidad referenciaMin referenciaMax referenciaTexto");
+      .populate("items.examenId", "nombre tipo instrucciones");
 
     res.json({ success: true, data: ordenActualizada });
     await registrarAudit(
@@ -308,7 +305,7 @@ export const listarOrdenesPendientes = async (_req: Request, res: Response) => {
       .populate("pacienteId", "nombres apellidos dni")
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo unidad")
+      .populate("items.examenId", "nombre tipo")
       .sort({ fecha: -1 });
     res.json({ success: true, data: ordenes });
   } catch (error: any) {
@@ -316,62 +313,70 @@ export const listarOrdenesPendientes = async (_req: Request, res: Response) => {
   }
 };
 
-// ── Generar cita de laboratorio desde una orden ──
+// ── Generar cita de laboratorio desde una orden ──────────────────
+// No requiere fecha ni hora: la cita tiene un período de validez de 7 días.
+// El paciente puede presentarse cualquier día dentro del período con las
+// instrucciones de preparación correspondientes.
 export const generarCitaLab = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { fecha, hora, doctorId } = req.body;
 
-    if (!fecha || !hora || !doctorId) {
-      return res.status(400).json({ success: false, message: "fecha, hora y doctorId son requeridos" });
-    }
+    const orden = await OrdenExamen.findById(id)
+      .populate("items.examenId", "nombre tipo instrucciones validezDias");
 
-    const orden = await OrdenExamen.findById(id);
     if (!orden) return res.status(404).json({ success: false, message: "Orden no encontrada" });
 
     if (orden.citaLabId) {
-      return res.status(400).json({ success: false, message: "Esta orden ya tiene una cita de laboratorio generada" });
+      return res.status(400).json({ success: false, message: "Esta orden ya tiene una autorización de laboratorio generada" });
     }
 
     if (orden.estado === "VENCIDA" || orden.estado === "CANCELADA") {
-      return res.status(400).json({ success: false, message: `No se puede generar cita para una orden en estado ${orden.estado}` });
+      return res.status(400).json({ success: false, message: `No se puede generar autorización para una orden en estado ${orden.estado}` });
     }
 
-    // Verificar que el doctor existe
-    const doctor = await Doctor.findById(doctorId);
-    if (!doctor) return res.status(404).json({ success: false, message: "Doctor de laboratorio no encontrado" });
+    // Calcular vigencia mínima entre todos los exámenes de la orden
+    let validezDias = 7;
+    const instruccionesUnicas = new Set<string>();
 
-    // Crear fecha UTC
-    const [year, month, day] = fecha.split("-").map(Number);
-    const fechaUTC = new Date(Date.UTC(year, month - 1, day));
-
-    // Verificar que no haya conflicto de horario
-    const citaExistente = await Cita.findOne({ doctorId, fecha: fechaUTC, hora });
-    if (citaExistente) {
-      return res.status(400).json({ success: false, message: "Ya existe una cita para ese horario" });
+    for (const item of orden.items) {
+      const examen = item.examenId as any;
+      if (examen?.validezDias && examen.validezDias < validezDias) {
+        validezDias = examen.validezDias;
+      }
+      if (examen?.instrucciones?.trim()) {
+        instruccionesUnicas.add(examen.instrucciones.trim());
+      }
     }
 
-    // Crear cita tipo LABORATORIO
+    const instrucciones = [...instruccionesUnicas].join("\n\n");
+
+    // Fecha de emisión y vigencia
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const fechaEmision = new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()));
+    const fechaVigenciaHasta = new Date(fechaEmision);
+    fechaVigenciaHasta.setUTCDate(fechaVigenciaHasta.getUTCDate() + validezDias);
+
+    // Crear autorización de laboratorio (sin hora ni doctor)
     const citaLab = await Cita.create({
       pacienteId: orden.pacienteId,
-      doctorId,
-      fecha: fechaUTC,
-      hora,
+      fecha: fechaEmision,
       tipo: "LABORATORIO",
       estado: "PENDIENTE",
+      fechaVigenciaHasta,
+      instrucciones,
     });
 
-    // Actualizar orden con citaLabId y cambiar estado a EN_PROCESO
+    // Actualizar orden
     orden.citaLabId = citaLab._id as mongoose.Types.ObjectId;
     orden.estado = "EN_PROCESO";
     await orden.save();
 
-    // Registrar en AuditLog
     await registrarAudit(
       req.user?.userId ?? "desconocido",
       "generar_cita_lab",
       String(orden._id),
-      { citaLabId: citaLab._id, fecha, hora, doctorId },
+      { citaLabId: citaLab._id, fechaEmision, fechaVigenciaHasta, validezDias },
       req.ip,
       { estadoAnterior: "PENDIENTE", estadoNuevo: "EN_PROCESO" }
     );
@@ -380,7 +385,7 @@ export const generarCitaLab = async (req: AuthRequest, res: Response) => {
       .populate("pacienteId", "nombres apellidos dni")
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo unidad");
+      .populate("items.examenId", "nombre tipo instrucciones validezDias");
 
     res.json({ success: true, data: ordenActualizada, citaLab });
   } catch (error: any) {
@@ -398,7 +403,7 @@ export const buscarOrdenPorCodigo = async (req: Request, res: Response) => {
       .populate("pacienteId", "nombres apellidos dni fechaNacimiento sexo")
       .populate("doctorId", "nombres apellidos cmp")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo unidad referenciaMin referenciaMax referenciaTexto");
+      .populate("items.examenId", "nombre tipo instrucciones");
 
     if (!orden) return res.status(404).json({ success: false, message: "No se encontró orden con ese código" });
 
@@ -418,7 +423,7 @@ export const listarOrdenesSinCitaLab = async (_req: Request, res: Response) => {
       .populate("pacienteId", "nombres apellidos dni")
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo unidad")
+      .populate("items.examenId", "nombre tipo")
       .sort({ fechaVencimiento: 1 });
 
     res.json({ success: true, data: ordenes });
@@ -438,7 +443,7 @@ export const obtenerOrdenParaImprimir = async (req: Request, res: Response) => {
         populate: { path: "especialidadId", select: "nombre" },
       })
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo unidad referenciaMin referenciaMax referenciaTexto descripcion");
+      .populate("items.examenId", "nombre tipo descripcion instrucciones");
 
     if (!orden) return res.status(404).json({ success: false, message: "Orden no encontrada" });
 
@@ -488,7 +493,7 @@ export const actualizarOrden = async (req: AuthRequest, res: Response) => {
       .populate("pacienteId", "nombres apellidos dni")
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo unidad referenciaMin referenciaMax referenciaTexto");
+      .populate("items.examenId", "nombre tipo instrucciones");
 
     res.json({ success: true, data: ordenActualizada });
   } catch (error: any) {

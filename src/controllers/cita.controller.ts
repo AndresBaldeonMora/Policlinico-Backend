@@ -88,6 +88,7 @@ export const listarCitas = async (_req: Request, res: Response) => {
         fecha: fechaFormateada,
         hora: cita.hora,
         estado: cita.estado,
+        tipo: cita.tipo,
       };
     });
 
