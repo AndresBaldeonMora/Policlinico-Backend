@@ -12,8 +12,10 @@ import {
   cancelarOrden,
   actualizarOrden,
   generarCitaLab,
+  subirArchivoResultado,
 } from "../controllers/examen.controller";
 import { verifyToken, requireRole } from "../middlewares/authMiddlewares";
+import { upload } from "../config/cloudinary";
 import { AuditLog } from "../models/AuditLog";
 const router = Router();
 
@@ -35,7 +37,8 @@ router.get("/cita/:citaId",               listarOrdenesPorCita);
 router.get("/:id",                        obtenerOrden);
 router.get("/:id/imprimir",               obtenerOrdenParaImprimir);
 router.patch("/:id/generar-cita-lab",     generarCitaLab);
-router.patch("/:id/resultados",           cargarResultados);
+router.patch("/:id/resultados",           verifyToken, cargarResultados);
+router.post("/:id/subir-archivo",         verifyToken, upload.single("archivo"), subirArchivoResultado);
 router.patch("/:id/cancelar",             cancelarOrden);
 router.patch("/:id",                      verifyToken, requireRole(["MEDICO"]), actualizarOrden);
 

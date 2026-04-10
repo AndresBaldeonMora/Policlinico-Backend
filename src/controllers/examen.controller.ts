@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import "multer"; // tipos para req.file
 import { ExamenLaboratorio } from "../models/ExamenLaboratorio";
 import { AuditLog } from "../models/AuditLog";
 import { OrdenExamen } from "../models/OrdenExamen";
@@ -7,6 +8,9 @@ import { Usuario } from "../models/Usuario";
 import mongoose from "mongoose";
 import { AuthRequest } from "../middlewares/authMiddlewares";
 import { generarCodigoOrden } from "../utils/generarCodigoOrden";
+import cloudinary from "../config/cloudinary";
+import { enviarCorreoResultados } from "../config/mailer";
+import { Paciente } from "../models/Paciente";
 
 // ─────────────────────────────────────────────────────────────
 // AUDIT LOG
@@ -228,7 +232,7 @@ export const obtenerOrden = async (req: Request, res: Response) => {
 };
 
 // Cargar resultados de uno o varios ítems de la orden
-export const cargarResultados = async (req: Request, res: Response) => {
+export const cargarResultados = async (req: Request<{ id: string }>, res: Response) => {
   try {
     const { id } = req.params;
     const { resultados } = req.body;
@@ -265,12 +269,57 @@ export const cargarResultados = async (req: Request, res: Response) => {
       .populate("items.examenId", "nombre tipo instrucciones");
 
     res.json({ success: true, data: ordenActualizada });
+
+    // Enviar correo al paciente si la orden se completó
+    if (todosCompletos) {
+      try {
+        const paciente = await Paciente.findById(orden.pacienteId);
+        if (paciente?.correo) {
+          const ordenPopulada = await OrdenExamen.findById(id)
+            .populate("doctorId", "nombres apellidos cmp")
+            .populate("especialidadId", "nombre")
+            .populate("items.examenId", "nombre tipo");
+          const doc = ordenPopulada?.doctorId as any;
+          const esp = ordenPopulada?.especialidadId as any;
+          const examenes = (ordenPopulada?.items || []).map((item) => {
+            const ex = typeof item.examenId === "object" ? (item.examenId as any) : null;
+            return {
+              nombre: ex?.nombre || "Examen",
+              tipo: ex?.tipo || "—",
+              valor: item.valorResultado || "—",
+              unidad: item.unidadResultado,
+              archivoUrl: item.archivoUrl,
+            };
+          });
+          await enviarCorreoResultados({
+            correo: paciente.correo,
+            paciente: {
+              nombres: paciente.nombres,
+              apellidos: paciente.apellidos,
+              dni: paciente.dni,
+              fechaNacimiento: paciente.fechaNacimiento?.toISOString(),
+              sexo: paciente.sexo,
+            },
+            doctor: { nombres: doc?.nombres || "", apellidos: doc?.apellidos || "", cmp: doc?.cmp },
+            especialidad: esp?.nombre || "",
+            codigoOrden: orden.codigoOrden || id,
+            fechaOrden: orden.fecha.toISOString(),
+            examenes,
+            observaciones: orden.observacionesGenerales,
+          });
+          console.log(`📧 Correo enviado a ${paciente.correo}`);
+        }
+      } catch (emailErr) {
+        console.error("Error al enviar correo:", emailErr);
+      }
+    }
+
     await registrarAudit(
-      (req as AuthRequest).user?.userId ?? "desconocido",
+      (req as AuthRequest).user!.userId,
       "cargar_resultados",
       id,
       { resultados, estadoFinal: orden.estado },
-      req.ip
+      req.ip as string | undefined
     );
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
@@ -298,10 +347,11 @@ export const cancelarOrden = async (req: Request, res: Response) => {
   }
 };
 
-// Listar todas las órdenes pendientes (para técnico de laboratorio)
+// Listar órdenes — ?todos=true trae todas, por defecto solo PENDIENTE/EN_PROCESO
 export const listarOrdenesPendientes = async (_req: Request, res: Response) => {
   try {
-    const ordenes = await OrdenExamen.find({ estado: { $in: ["PENDIENTE", "EN_PROCESO"] } })
+    const filtro = _req.query.todos === "true" ? {} : { estado: { $in: ["PENDIENTE", "EN_PROCESO"] } };
+    const ordenes = await OrdenExamen.find(filtro)
       .populate("pacienteId", "nombres apellidos dni")
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
@@ -496,6 +546,54 @@ export const actualizarOrden = async (req: AuthRequest, res: Response) => {
       .populate("items.examenId", "nombre tipo instrucciones");
 
     res.json({ success: true, data: ordenActualizada });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── Subir archivo de resultado a Cloudinary ──
+export const subirArchivoResultado = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { examenId } = req.body;
+    const file = req.file;
+
+    if (!file) return res.status(400).json({ success: false, message: "No se envió ningún archivo" });
+    if (!examenId) return res.status(400).json({ success: false, message: "Se requiere examenId" });
+
+    const orden = await OrdenExamen.findById(id);
+    if (!orden) return res.status(404).json({ success: false, message: "Orden no encontrada" });
+
+    // Obtener extensión del archivo original
+    const ext = file.originalname.split(".").pop() || "file";
+    const publicId = `${orden.codigoOrden || "ORD"}_${examenId}_${Date.now()}`;
+
+    // Subir a Cloudinary
+    const resultado = await new Promise<any>((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: "policlinico/resultados",
+          resource_type: "auto",
+          public_id: publicId,
+          format: ext,
+          use_filename: true,
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+      stream.end(file.buffer);
+    });
+
+    // Guardar URL en el item
+    const item = orden.items.find((i) => i.examenId.toString() === examenId);
+    if (!item) return res.status(404).json({ success: false, message: "Examen no encontrado en la orden" });
+
+    item.archivoUrl = resultado.secure_url;
+    await orden.save();
+
+    res.json({ success: true, url: resultado.secure_url });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

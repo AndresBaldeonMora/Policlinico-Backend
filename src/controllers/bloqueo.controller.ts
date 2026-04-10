@@ -143,7 +143,7 @@ export const verificarBloqueo = async (req: AuthRequest, res: Response) => {
   try {
     const { doctorId, fecha } = req.params;
 
-    const fechaUTC = crearFechaUTC(fecha);
+    const fechaUTC = crearFechaUTC(fecha as string);
     if (isNaN(fechaUTC.getTime())) {
       return res.status(400).json({ success: false, message: "Formato de fecha inválido" });
     }

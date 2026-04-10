@@ -6,6 +6,7 @@ export interface IItemOrden {
   // Resultado capturado por técnico de laboratorio
   valorResultado?: string;
   unidadResultado?: string;
+  archivoUrl?: string;
   fechaResultado?: Date;
   estadoItem: "PENDIENTE" | "COMPLETADO";
 }
@@ -32,6 +33,7 @@ const itemOrdenSchema = new Schema<IItemOrden>(
     observaciones:    { type: String, trim: true, default: "" },
     valorResultado:   { type: String, trim: true },
     unidadResultado:  { type: String, trim: true },
+    archivoUrl:       { type: String, trim: true },
     fechaResultado:   { type: Date },
     estadoItem: {
       type: String,
