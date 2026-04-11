@@ -9,7 +9,8 @@ import citaRoutes from "./routes/cita.routes";
 import horarioRoutes from "./routes/horario.routes";
 import testRoutes from "./routes/test.routes";
 import authRoutes from "./routes/auth.routes";
-import reniecRoutes from "./routes/reniec.routes";
+
+import bloqueoRoutes from "./routes/bloqueo.routes";
 import examenRoutes from "./routes/examen.routes";
 import ordenRoutes from "./routes/orden.routes";
 import reportesRoutes from "./routes/reportes.routes";
@@ -37,9 +38,9 @@ app.get("/", (_req, res) => {
       doctores: "/api/doctores",
       citas: "/api/citas",
       horarios: "/api/horarios",
-      reniec: "/api/reniec/:dni",
       medico: "/api/medico",
       examenes: "/api/examenes",
+      bloqueos: "/api/bloqueos",
       ordenes: "/api/ordenes",
       reportes: "/api/reportes",
     },
@@ -55,7 +56,8 @@ app.use("/api/citas", citaRoutes);
 app.use("/api/horarios", horarioRoutes);
 app.use("/api/test", testRoutes);
 app.use("/api/auth", authRoutes);
-app.use("/api/reniec", reniecRoutes);
+
+app.use("/api/bloqueos", bloqueoRoutes);
 app.use("/api/examenes", examenRoutes);
 app.use("/api/ordenes", ordenRoutes);
 app.use("/api/reportes", reportesRoutes);

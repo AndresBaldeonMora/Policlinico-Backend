@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { Paciente } from "../models/Paciente";
+import { Cita } from "../models/Cita";
+import { OrdenExamen } from "../models/OrdenExamen";
 
 // ─── Validaciones ─────────────────────────────────────────
 const soloLetras    = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/;
@@ -106,6 +108,63 @@ export const actualizarPaciente = async (req: Request, res: Response) => {
     );
     if (!paciente) return res.status(404).json({ success: false, message: "Paciente no encontrado" });
     res.json({ success: true, message: "Paciente actualizado correctamente", data: paciente });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Historial completo del paciente
+export const obtenerHistorial = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const citasPagina = parseInt(req.query.citasPagina as string) || 1;
+    const ordenesPagina = parseInt(req.query.ordenesPagina as string) || 1;
+    const porPagina = 20;
+
+    const paciente = await Paciente.findById(id);
+    if (!paciente) {
+      return res.status(404).json({ success: false, message: "Paciente no encontrado" });
+    }
+
+    const [citas, totalCitas, ordenes, totalOrdenes] = await Promise.all([
+      Cita.find({ pacienteId: id })
+        .populate({
+          path: "doctorId",
+          select: "nombres apellidos especialidadId",
+          populate: { path: "especialidadId", select: "nombre" },
+        })
+        .sort({ fecha: -1, hora: -1 })
+        .skip((citasPagina - 1) * porPagina)
+        .limit(porPagina),
+      Cita.countDocuments({ pacienteId: id }),
+      OrdenExamen.find({ pacienteId: id })
+        .populate("doctorId", "nombres apellidos")
+        .populate("especialidadId", "nombre")
+        .populate("items.examenId", "nombre tipo unidad referenciaMin referenciaMax referenciaTexto")
+        .sort({ fecha: -1 })
+        .skip((ordenesPagina - 1) * porPagina)
+        .limit(porPagina),
+      OrdenExamen.countDocuments({ pacienteId: id }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        paciente,
+        citas: {
+          data: citas,
+          total: totalCitas,
+          pagina: citasPagina,
+          totalPaginas: Math.ceil(totalCitas / porPagina),
+        },
+        ordenes: {
+          data: ordenes,
+          total: totalOrdenes,
+          pagina: ordenesPagina,
+          totalPaginas: Math.ceil(totalOrdenes / porPagina),
+        },
+      },
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

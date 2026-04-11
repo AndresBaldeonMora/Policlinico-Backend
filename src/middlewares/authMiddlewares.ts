@@ -70,7 +70,9 @@ export const verifyToken = async (
 
 export const requireRole = (roles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (!req.user || !roles.includes(req.user.rol)) {
+    const userRol = (req.user?.rol ?? "").toLowerCase();
+    const rolesLower = roles.map((r) => r.toLowerCase());
+    if (!req.user || !rolesLower.includes(userRol)) {
       return res.status(403).json({ message: "No tienes permisos" });
     }
     next();
