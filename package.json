@@ -8,6 +8,7 @@
     "dev:clean": "rm -rf dist node_modules/.cache && nodemon --exec ts-node src/index.ts",
     "seed": "ts-node src/config/seed.ts",
     "seed:examenes": "ts-node src/config/seedExamenes.ts",
+    "seed:ordenes": "ts-node src/config/seedOrdenes.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },
