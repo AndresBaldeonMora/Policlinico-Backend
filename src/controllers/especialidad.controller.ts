@@ -13,7 +13,7 @@ const validarNombre = (nombre: string): string | null => {
 const mapEspecialidad = (e: any) => ({
   id: e._id.toString(),
   nombre: e.nombre,
-  tieneLaboratorio: e.tieneLaboratorio,
+  tieneLaboratorioImagenImagen: e.tieneLaboratorioImagenImagen,
   examenes: (e.examenes ?? []).map((ex: any) =>
     ex._id ? { _id: ex._id.toString(), nombre: ex.nombre, tipo: ex.tipo } : ex.toString()
   ),
@@ -47,12 +47,12 @@ export const obtenerEspecialidad = async (req: Request, res: Response) => {
 // Crear especialidad
 export const crearEspecialidad = async (req: Request, res: Response) => {
   try {
-    const { nombre, tieneLaboratorio, examenes } = req.body;
+    const { nombre, tieneLaboratorioImagen, examenes } = req.body;
     const error = validarNombre(nombre);                                     
     if (error) return res.status(400).json({ success: false, message: error });
     const especialidad = await Especialidad.create({
       nombre: nombre.trim(),
-      tieneLaboratorio: tieneLaboratorio ?? false,
+      tieneLaboratorioImagen: tieneLaboratorioImagen ?? false,
       examenes: examenes ?? [],  
     });
     res.status(201).json({ success: true, data: mapEspecialidad(especialidad) });
@@ -76,7 +76,7 @@ export const eliminarEspecialidad = async (req: Request, res: Response) => {
 
 export const actualizarEspecialidad = async (req: Request, res: Response) => {
   try {
-    const { nombre, tieneLaboratorio, examenes } = req.body;
+    const { nombre, tieneLaboratorioImagen, examenes } = req.body;
     if (nombre !== undefined) {                                               
       const error = validarNombre(nombre);
       if (error) return res.status(400).json({ success: false, message: error });
@@ -85,7 +85,7 @@ export const actualizarEspecialidad = async (req: Request, res: Response) => {
       req.params.id,
       {
         nombre: nombre?.trim(),
-        tieneLaboratorio,
+        tieneLaboratorioImagen,
         ...(examenes !== undefined && { examenes }),  
       },
       { new: true, runValidators: true }

@@ -1,8 +1,15 @@
 import mongoose, { Schema, Document } from "mongoose";
 
+export interface IRespuestaProtocolar {
+  preguntaId: string;
+  preguntaTexto: string;
+  respuesta: string;
+}
+
 export interface IItemOrden {
   examenId: mongoose.Types.ObjectId;
   observaciones?: string;
+  respuestasProtocolares: IRespuestaProtocolar[];
   valorResultado?: string;
   unidadResultado?: string;
   archivoUrl?: string;
@@ -42,14 +49,24 @@ export interface IOrdenExamen extends Document {
   observacionesGenerales?: string;
 }
 
+const respuestaProtocolarSchema = new Schema<IRespuestaProtocolar>(
+  {
+    preguntaId:    { type: String, required: true },
+    preguntaTexto: { type: String, required: true },
+    respuesta:     { type: String, required: true },
+  },
+  { _id: false }
+);
+
 const itemOrdenSchema = new Schema<IItemOrden>(
   {
-    examenId: { type: Schema.Types.ObjectId, ref: "ExamenLaboratorio", required: true },
-    observaciones:    { type: String, trim: true, default: "" },
-    valorResultado:   { type: String, trim: true },
-    unidadResultado:  { type: String, trim: true },
-    archivoUrl:       { type: String, trim: true },
-    fechaResultado:   { type: Date },
+    examenId: { type: Schema.Types.ObjectId, ref: "ExamenLaboratorioImagen", required: true },
+    observaciones:           { type: String, trim: true, default: "" },
+    respuestasProtocolares:  { type: [respuestaProtocolarSchema], default: [] },
+    valorResultado:          { type: String, trim: true },
+    unidadResultado:         { type: String, trim: true },
+    archivoUrl:              { type: String, trim: true },
+    fechaResultado:          { type: Date },
     estadoItem: {
       type: String,
       enum: ["PENDIENTE", "COMPLETADO"],

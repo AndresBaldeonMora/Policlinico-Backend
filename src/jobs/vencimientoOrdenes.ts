@@ -18,7 +18,7 @@ export const verificarOrdenesVencidas = async (): Promise<number> => {
 
   for (const orden of ordenesVencidas) {
     orden.estado = "VENCIDA";
-    orden.motivoVencimiento = "Plazo de 30 días expirado sin generar cita de laboratorio";
+    orden.motivoVencimiento = "Plazo de 30 días expirado sin generar cita de laboratorio / imagen";
     await orden.save();
 
     try {
