@@ -66,7 +66,7 @@ export const enviarCorreoResultados = async (datos: DatosCorreoResultados) => {
   // Mensaje simple
   const html = `
     <p>Estimado(a) <strong>${paciente.nombres} ${paciente.apellidos}</strong>,</p>
-    <p>Sus resultados de laboratorio de la orden <strong>${codigoOrden}</strong> están listos.</p>
+    <p>Sus resultados de laboratorio / imagen de la orden <strong>${codigoOrden}</strong> están listos.</p>
     <p>Encontrará los detalles en los archivos adjuntos.</p>
     <br>
     <p>Atentamente,<br><strong>Policlínico Parroquial San José</strong></p>
@@ -76,7 +76,7 @@ export const enviarCorreoResultados = async (datos: DatosCorreoResultados) => {
   await transporter.sendMail({
     from: `"Policlínico San José" <${process.env.SMTP_USER}>`,
     to: correo,
-    subject: `Resultados de Laboratorio — ${codigoOrden} | Policlínico San José`,
+    subject: `Resultados de Laboratorio / Imagen — ${codigoOrden} | Policlínico San José`,
     html,
     attachments: adjuntos,
   });

@@ -13,7 +13,7 @@ import { OrdenExamen } from "../models/OrdenExamen";
 import { Paciente } from "../models/Paciente";
 import { Doctor } from "../models/Doctor";
 import { Especialidad } from "../models/Especialidad";
-import { ExamenLaboratorio } from "../models/ExamenLaboratorio";
+import { ExamenLaboratorioImagen } from "../models/ExamenLaboratorioImagen";
 
 const generarCodigo = (idx: number): string => {
   const hoy = new Date();
@@ -47,13 +47,13 @@ async function seedOrdenes() {
       process.exit(1);
     }
 
-    const especialidades = await Especialidad.find({ tieneLaboratorio: true }).limit(3);
+    const especialidades = await Especialidad.find({ tieneLaboratorioImagen: true }).limit(3);
     if (especialidades.length === 0) {
       console.error("No hay especialidades con laboratorio.");
       process.exit(1);
     }
 
-    const examenes = await ExamenLaboratorio.find({ activo: true }).limit(10);
+    const examenes = await ExamenLaboratorioImagen.find({ activo: true }).limit(10);
     if (examenes.length === 0) {
       console.error("No hay exámenes de laboratorio. Ejecuta npm run seed:examenes primero.");
       process.exit(1);
