@@ -14,6 +14,25 @@ export interface ICita extends Document {
   fechaVigenciaHasta?: Date;   // Hasta cuándo es válida la cita de laboratorio
   instrucciones?: string;      // Indicaciones compiladas para el paciente
 
+  // Campos clínicos (llena el médico)
+  notasClinicas?: string;      // Observaciones clínicas libres
+  diagnostico?: string;        // Diagnóstico principal CIE-10 o texto libre
+  tratamiento?: string;        // Plan de tratamiento
+
+  // Campos de flujo
+  horarioAsistencia?: Date;    // Timestamp de confirmación de asistencia
+  motivoCancelacion?: string;  // Por qué se canceló
+
+  // Medicamentos prescritos
+  medicamentosPrescritos?: {
+    medicamentoId: mongoose.Types.ObjectId;
+    nombre: string;
+    dosis: string;
+    frecuencia: string;
+    duracion: string;
+    observaciones?: string;
+  }[];
+
   // Preparado para pagos (NO obligatorio por ahora)
   pago?: {
     metodo: "TARJETA" | "EFECTIVO" | "TRANSFERENCIA";
@@ -73,6 +92,23 @@ const citaSchema = new Schema<ICita>(
       required: false,
       default: "",
     },
+
+    // Campos clínicos
+    notasClinicas:     { type: String, default: "" },
+    diagnostico:       { type: String, default: "" },
+    tratamiento:       { type: String, default: "" },
+    horarioAsistencia: { type: Date, required: false },
+    motivoCancelacion: { type: String, required: false },
+
+    // Medicamentos prescritos
+    medicamentosPrescritos: [{
+      medicamentoId: { type: Schema.Types.ObjectId, ref: "Medicamento" },
+      nombre:        { type: String, required: true },
+      dosis:         { type: String, required: true },
+      frecuencia:    { type: String, required: true },
+      duracion:      { type: String, required: true },
+      observaciones: { type: String, default: "" },
+    }],
 
     pago: {
       metodo: {

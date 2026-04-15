@@ -203,6 +203,7 @@ export const obtenerCitaPorId = async (req: Request, res: Response) => {
 export const cancelarCita = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const { motivoCancelacion } = req.body;
 
     const cita = await Cita.findById(id);
     if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
@@ -212,10 +213,32 @@ export const cancelarCita = async (req: Request, res: Response) => {
     }
 
     cita.estado = "CANCELADA";
+    if (motivoCancelacion) cita.motivoCancelacion = motivoCancelacion;
     await cita.save();
 
-    res.json({ success: true, message: "Cita cancelada correctamente" });
+    res.json({ success: true, data: cita, message: "Cita cancelada correctamente" });
   } catch (error: any) {
     res.status(500).json({ success: false, message: "Error al cancelar la cita", error: error.message });
+  }
+};
+
+export const marcarAsistencia = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const cita = await Cita.findById(id);
+    if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
+
+    if (cita.estado !== "PENDIENTE") {
+      return res.status(400).json({ success: false, message: "Solo se puede confirmar asistencia en citas PENDIENTE" });
+    }
+
+    cita.estado = "ATENDIDA";
+    cita.horarioAsistencia = new Date();
+    await cita.save();
+
+    res.json({ success: true, data: cita, message: "Asistencia confirmada correctamente" });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: "Error al marcar asistencia", error: error.message });
   }
 };

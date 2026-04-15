@@ -98,6 +98,52 @@ export const actualizarEstadoCita = async (req: Request, res: Response) => {
   }
 };
 
+export const prescribirMedicamentos = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { medicamentos } = req.body;
+
+    if (!Array.isArray(medicamentos)) {
+      return res.status(400).json({ success: false, message: "medicamentos debe ser un array" });
+    }
+
+    const cita = await Cita.findByIdAndUpdate(
+      id,
+      { medicamentosPrescritos: medicamentos },
+      { new: true }
+    ).populate("pacienteId", "nombres apellidos dni telefono");
+
+    if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
+
+    res.json({ success: true, data: cita });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const guardarNotasClinicas = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { notasClinicas, diagnostico, tratamiento } = req.body;
+
+    if (!diagnostico || diagnostico.trim().length === 0) {
+      return res.status(400).json({ success: false, message: "El diagnóstico es obligatorio" });
+    }
+
+    const cita = await Cita.findByIdAndUpdate(
+      id,
+      { notasClinicas, diagnostico, tratamiento },
+      { new: true }
+    ).populate("pacienteId", "nombres apellidos dni telefono");
+
+    if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
+
+    res.json({ success: true, data: cita });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export const obtenerDetalleCita = async (req: Request, res: Response) => {
   try {
     const cita = await Cita.findById(req.params.id).populate(
