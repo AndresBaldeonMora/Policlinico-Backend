@@ -4,6 +4,7 @@ dotenv.config(); // ← PRIMERO ESTO
 import app from "./app";
 import connectDB from "./config/database";
 import { verificarOrdenesVencidas } from "./jobs/vencimientoOrdenes";
+import { verificarCitasVencidas } from "./jobs/vencimientoCitas";
 import { seedMedicamentos } from "./config/seedMedicamentos";
 
 const PORT = process.env.PORT || 3000;
@@ -13,8 +14,9 @@ async function main() {
     await connectDB();
     console.log("✅ Conectado a MongoDB correctamente");
 
-    // Verificar órdenes vencidas al arrancar
+    // Verificar órdenes y citas vencidas al arrancar
     await verificarOrdenesVencidas();
+    await verificarCitasVencidas();
 
     // Poblar catálogo de medicamentos si está vacío
     await seedMedicamentos();
