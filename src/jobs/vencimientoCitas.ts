@@ -2,59 +2,45 @@ import { Cita } from "../models/Cita";
 import { AuditLog } from "../models/AuditLog";
 
 /**
- * Verifica citas pasadas: estado PENDIENTE, cuya fecha y hora ya pasaron respecto a ahora.
- * Las actualiza a estado CANCELADA (anuladas) y registra en AuditLog.
+ * Marca como VENCIDAS las citas PENDIENTE o REPROGRAMADA cuya fecha ya pasó
+ * (comparación solo por día — se ejecuta a las 00:01 del día siguiente).
  */
 export const verificarCitasVencidas = async (): Promise<number> => {
+  // Inicio del día actual en UTC (00:00:00.000)
   const hoy = new Date();
+  hoy.setUTCHours(0, 0, 0, 0);
 
-  // Traer todas las citas pendientes
-  const citasPendientes = await Cita.find({
-    estado: "PENDIENTE",
+  const citasAbiertas = await Cita.find({
+    estado: { $in: ["PENDIENTE", "REPROGRAMADA"] },
+    fecha: { $lt: hoy },
   });
 
-  if (citasPendientes.length === 0) return 0;
+  if (citasAbiertas.length === 0) return 0;
 
-  let citasCanceladas = 0;
+  let vencidas = 0;
 
-  for (const cita of citasPendientes) {
-    // Reconstruir la fecha + hora en UTC para comparar con hoy
-    const fechaCita = new Date(cita.fecha);
-    
-    if (cita.hora) {
-      const [horas, minutos] = cita.hora.split(":").map(Number);
-      fechaCita.setUTCHours(horas, minutos, 0, 0);
-    } else {
-      // Si por alguna razón no tiene hora, se asume el final del día
-      fechaCita.setUTCHours(23, 59, 59, 999);
-    }
+  for (const cita of citasAbiertas) {
+    const estadoAnterior = cita.estado;
+    cita.estado = "VENCIDA";
+    cita.motivoCancelacion = "Cita no atendida ni reprogramada. Vencimiento automático.";
+    await cita.save();
+    vencidas++;
 
-    // Si la fecha y hora de la cita ya pasó
-    if (fechaCita < hoy) {
-      cita.estado = "CANCELADA";
-      cita.motivoCancelacion = "Cita no atendida en el horario programado. Anulación automática.";
-      await cita.save();
-      citasCanceladas++;
-
-      try {
-        await AuditLog.create({
-          usuarioId: cita.doctorId || cita.pacienteId,
-          accion: "cancelar_cita_automatica",
-          entidad: "Cita",
-          entidadId: cita._id,
-          estadoAnterior: "PENDIENTE",
-          estadoNuevo: "CANCELADA",
-          descripcion: `Cita de PENDIENTE a CANCELADA automáticamente por tiempo expirado (Hora cita: ${cita.hora})`,
-        });
-      } catch (err) {
-        console.error("Error al registrar audit de vencimiento de cita:", err);
-      }
+    try {
+      await AuditLog.create({
+        usuarioId: cita.doctorId || cita.pacienteId,
+        accion: "vencer_cita_automatica",
+        entidad: "Cita",
+        entidadId: cita._id,
+        estadoAnterior,
+        estadoNuevo: "VENCIDA",
+        descripcion: `Cita de ${estadoAnterior} a VENCIDA automáticamente (fecha: ${cita.fecha.toISOString().split("T")[0]}, hora: ${cita.hora ?? "sin hora"})`,
+      });
+    } catch (err) {
+      console.error("Error al registrar audit de vencimiento de cita:", err);
     }
   }
 
-  if (citasCanceladas > 0) {
-    console.log(`⏰ ${citasCanceladas} cita(s) pendiente(s) marcada(s) como CANCELADA(s) (Vencida)`);
-  }
-  
-  return citasCanceladas;
+  console.log(`⏰ ${vencidas} cita(s) marcada(s) como VENCIDA(s) automáticamente`);
+  return vencidas;
 };

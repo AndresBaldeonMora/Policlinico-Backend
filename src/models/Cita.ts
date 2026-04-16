@@ -8,7 +8,7 @@ export interface ICita extends Document {
   fecha: Date;
   hora?: string;
   tipo: TipoCita;
-  estado: "PENDIENTE" | "ASISTIO" | "ATENDIDA" | "CANCELADA" | "REPROGRAMADA";
+  estado: "PENDIENTE" | "ASISTIO" | "ATENDIDA" | "CANCELADA" | "REPROGRAMADA" | "VENCIDA";
 
   // Exclusivos de citas LABORATORIO
   fechaVigenciaHasta?: Date;   // Hasta cuándo es válida la cita de laboratorio
@@ -77,7 +77,7 @@ const citaSchema = new Schema<ICita>(
 
     estado: {
       type: String,
-      enum: ["PENDIENTE","ASISTIO", "ATENDIDA", "CANCELADA", "REPROGRAMADA"],
+      enum: ["PENDIENTE","ASISTIO", "ATENDIDA", "CANCELADA", "REPROGRAMADA", "VENCIDA"],
       default: "PENDIENTE",
       required: true,
     },
