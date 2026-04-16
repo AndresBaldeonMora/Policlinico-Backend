@@ -222,23 +222,45 @@ export const cancelarCita = async (req: Request, res: Response) => {
   }
 };
 
+// marcarAsistencia — ahora pone ASISTIO, no ATENDIDA
 export const marcarAsistencia = async (req: Request, res: Response) => {
   try {
+    const cita = await Cita.findById(req.params.id);
+    if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
+
+    if (cita.estado !== "PENDIENTE" && cita.estado !== "REPROGRAMADA") {
+      return res.status(400).json({ success: false, message: "Solo se puede marcar asistencia en citas PENDIENTE o REPROGRAMADA" });
+    }
+
+    cita.estado = "ASISTIO";
+    cita.horarioAsistencia = new Date();
+    await cita.save();
+
+    res.json({ success: true, data: cita, message: "Asistencia marcada correctamente" });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: "Error al marcar asistencia", error: error.message });
+  }
+};
+
+// cambiarEstado — nuevo endpoint para ATENDIDA/CANCELADA desde detalle
+export const cambiarEstado = async (req: Request, res: Response) => {
+  try {
     const { id } = req.params;
+    const { estado } = req.body;
+
+    const estadosValidos = ["PENDIENTE", "ASISTIO", "ATENDIDA", "CANCELADA", "REPROGRAMADA"];
+    if (!estadosValidos.includes(estado)) {
+      return res.status(400).json({ success: false, message: "Estado inválido" });
+    }
 
     const cita = await Cita.findById(id);
     if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
 
-    if (cita.estado !== "PENDIENTE") {
-      return res.status(400).json({ success: false, message: "Solo se puede confirmar asistencia en citas PENDIENTE" });
-    }
-
-    cita.estado = "ATENDIDA";
-    cita.horarioAsistencia = new Date();
+    cita.estado = estado;
     await cita.save();
 
-    res.json({ success: true, data: cita, message: "Asistencia confirmada correctamente" });
+    res.json({ success: true, data: cita, message: "Estado actualizado" });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: "Error al marcar asistencia", error: error.message });
+    res.status(500).json({ success: false, message: "Error al cambiar estado", error: error.message });
   }
 };
