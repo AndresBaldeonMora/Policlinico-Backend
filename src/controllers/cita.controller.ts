@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { Cita } from "../models/Cita";
 import { Paciente } from "../models/Paciente";
 import { Doctor } from "../models/Doctor";
+import { BloqueoHorario } from "../models/BloqueoHorario";
 
 // ✅ Crea fecha en UTC puro para evitar desfase de zona horaria
 const crearFechaUTC = (fechaString: string): Date => {
@@ -28,6 +29,19 @@ export const crearCita = async (req: Request, res: Response) => {
     const fechaUTC = crearFechaUTC(fecha);
     if (isNaN(fechaUTC.getTime())) {
       return res.status(400).json({ success: false, message: "Formato de fecha inválido" });
+    }
+
+    // Verificar si el día está bloqueado para este doctor
+    const bloqueoActivo = await BloqueoHorario.findOne({
+      doctorId,
+      fecha: fechaUTC,
+      activo: true,
+    });
+    if (bloqueoActivo) {
+      return res.status(400).json({
+        success: false,
+        message: `No se puede crear la cita: el doctor tiene el día bloqueado. Motivo: ${bloqueoActivo.motivo}`,
+      });
     }
 
     const citaExistente = await Cita.findOne({ doctorId, fecha: fechaUTC, hora });
@@ -74,6 +88,7 @@ export const listarCitas = async (_req: Request, res: Response) => {
         fecha: fechaFormateada,
         hora: cita.hora,
         estado: cita.estado,
+        tipo: cita.tipo,
       };
     });
 
@@ -188,6 +203,7 @@ export const obtenerCitaPorId = async (req: Request, res: Response) => {
 export const cancelarCita = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const { motivoCancelacion } = req.body;
 
     const cita = await Cita.findById(id);
     if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
@@ -197,10 +213,32 @@ export const cancelarCita = async (req: Request, res: Response) => {
     }
 
     cita.estado = "CANCELADA";
+    if (motivoCancelacion) cita.motivoCancelacion = motivoCancelacion;
     await cita.save();
 
-    res.json({ success: true, message: "Cita cancelada correctamente" });
+    res.json({ success: true, data: cita, message: "Cita cancelada correctamente" });
   } catch (error: any) {
     res.status(500).json({ success: false, message: "Error al cancelar la cita", error: error.message });
+  }
+};
+
+export const marcarAsistencia = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const cita = await Cita.findById(id);
+    if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
+
+    if (cita.estado !== "PENDIENTE") {
+      return res.status(400).json({ success: false, message: "Solo se puede confirmar asistencia en citas PENDIENTE" });
+    }
+
+    cita.estado = "ATENDIDA";
+    cita.horarioAsistencia = new Date();
+    await cita.save();
+
+    res.json({ success: true, data: cita, message: "Asistencia confirmada correctamente" });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: "Error al marcar asistencia", error: error.message });
   }
 };
