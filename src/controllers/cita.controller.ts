@@ -3,6 +3,7 @@ import { Cita } from "../models/Cita";
 import { Paciente } from "../models/Paciente";
 import { Doctor } from "../models/Doctor";
 import { BloqueoHorario } from "../models/BloqueoHorario";
+import { verificarCitasVencidas } from "../jobs/vencimientoCitas";
 
 // ✅ Crea fecha en UTC puro para evitar desfase de zona horaria
 const crearFechaUTC = (fechaString: string): Date => {
@@ -143,6 +144,9 @@ export const obtenerCitasCalendario = async (req: Request, res: Response) => {
       ? new Date(Date.UTC(y, m - 1, d))
       : new Date();
 
+    // Limpiar citas vencidas antes de retornar datos al calendario
+    await verificarCitasVencidas();
+
     let fechaInicio: Date;
     let fechaFin: Date;
 
@@ -168,7 +172,10 @@ export const obtenerCitasCalendario = async (req: Request, res: Response) => {
         fechaFin    = new Date(Date.UTC(fechaBase.getUTCFullYear(), fechaBase.getUTCMonth() + 1, 0, 23, 59, 59, 999));
     }
 
-    const filtro: any = { fecha: { $gte: fechaInicio, $lte: fechaFin } };
+    const filtro: any = { 
+      fecha: { $gte: fechaInicio, $lte: fechaFin },
+      estado: { $nin: ["ATENDIDA", "CANCELADA"] }
+    };
     if (medicoId) filtro.doctorId = medicoId;
 
     const citas = await Cita.find(filtro)

@@ -9,6 +9,7 @@
     "seed": "ts-node src/config/seed.ts",
     "seed:examenes": "ts-node src/config/seedExamenes.ts",
     "seed:ordenes": "ts-node src/config/seedOrdenes.ts",
+    "seed:citas": "ts-node src/config/seedCitas.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },
