@@ -180,6 +180,9 @@ export const crearOrden = async (req: AuthRequest, res: Response) => {
       items: items.map((item: any) => ({
         examenId: item.examenId,
         observaciones: item.observaciones || "",
+        respuestasProtocolares: Array.isArray(item.respuestasProtocolares)
+          ? item.respuestasProtocolares
+          : [],
         estadoItem: "PENDIENTE",
       })),
       observacionesGenerales: observacionesGenerales || "",
