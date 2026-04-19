@@ -8,6 +8,7 @@ import {
   obtenerCitasCalendario,
   obtenerCitaPorId,
   cancelarCita,
+  cambiarEstado,
   marcarAsistencia,
 } from "../controllers/cita.controller";
 
@@ -21,6 +22,7 @@ router.get("/", listarCitas);
 router.get("/:id", obtenerCitaPorId);
 router.put("/:id/reprogramar", reprogramarCita);
 router.put("/:id/cancelar", cancelarCita);
+router.patch("/:id/estado", cambiarEstado); 
 router.patch("/:id/marcar-asistencia", marcarAsistencia);
 
 

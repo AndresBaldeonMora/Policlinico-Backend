@@ -187,10 +187,21 @@ export const obtenerHorariosDisponibles = async (req: Request, res: Response) =>
 
     const horasOcupadas = new Set(citasAgendadas.map((c) => c.hora));
 
-    const horariosDisponibles = horariosBase.map((hora) => ({
-      hora,
-      disponible: !horasOcupadas.has(hora),
-    }));
+    // Si la fecha solicitada es hoy (hora Peru UTC-5), descartar horas ya pasadas
+    const ahoraPeru = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Lima" }));
+    const [anioFecha, mesFecha, diaFecha] = (fecha as string).split("-").map(Number);
+    const esHoy =
+      anioFecha     === ahoraPeru.getFullYear() &&
+      mesFecha - 1  === ahoraPeru.getMonth()    &&
+      diaFecha      === ahoraPeru.getDate();
+
+    const minutosActuales = esHoy ? ahoraPeru.getHours() * 60 + ahoraPeru.getMinutes() : -1;
+
+    const horariosDisponibles = horariosBase.map((hora) => {
+      const [h, m] = hora.split(":").map(Number);
+      const yaPaso = esHoy && h * 60 + m <= minutosActuales;
+      return { hora, disponible: !horasOcupadas.has(hora) && !yaPaso };
+    });
 
     res.json({ success: true, data: horariosDisponibles });
   } catch (error: any) {
