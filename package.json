@@ -7,6 +7,7 @@
     "dev": "nodemon --exec ts-node src/index.ts",
     "dev:clean": "rm -rf dist node_modules/.cache && nodemon --exec ts-node src/index.ts",
     "seed": "ts-node src/config/seed.ts",
+    "seed:completo": "ts-node src/config/seedCompleto.ts",
     "seed:examenes": "ts-node src/config/seedExamenes.ts",
     "seed:ordenes": "ts-node src/config/seedOrdenes.ts",
     "seed:citas": "ts-node src/config/seedCitas.ts",

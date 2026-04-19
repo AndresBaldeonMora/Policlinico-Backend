@@ -22,9 +22,8 @@ async function main() {
     // Poblar catálogo de medicamentos si está vacío
     await seedMedicamentos();
 
-    // Cron diario a las 00:01 AM — vence citas del día anterior no atendidas
-    cron.schedule("1 0 * * *", async () => {
-      console.log("⏰ [CRON 00:01] Iniciando vencimiento automático de citas...");
+    // Cron cada 15 minutos — vence citas que superaron 30 min sin asistencia
+    cron.schedule("*/15 * * * *", async () => {
       await verificarCitasVencidas();
     });
 
