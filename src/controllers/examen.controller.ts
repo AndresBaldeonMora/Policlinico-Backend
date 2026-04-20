@@ -46,6 +46,26 @@ const registrarAudit = async (
 // Capacidad máxima del laboratorio por día (toma de muestras, 7–11 a.m.)
 export const CAPACIDAD_DIARIA_LAB = 15;
 
+const TIPOS_IMAGEN = ["RADIOGRAFIA", "ECOGRAFIA", "TOMOGRAFIA", "RESONANCIA", "ELECTROCARDIOGRAMA"];
+const TIPOS_LAB    = ["HEMATOLOGIA", "BIOQUIMICA", "ORINA", "HECES", "MICROBIOLOGIA", "INMUNOLOGIA", "HORMONAS"];
+
+// Duraciones estimadas por defecto (minutos) según modalidad
+const DURACION_DEFAULT: Record<string, number> = {
+  RADIOGRAFIA:       15,
+  ECOGRAFIA:         30,
+  TOMOGRAFIA:        30,
+  RESONANCIA:        60,
+  ELECTROCARDIOGRAMA: 20,
+};
+
+function detectarTipoOrden(tiposExamenes: string[]): "LABORATORIO" | "IMAGEN" | "MIXTA" {
+  const tieneImagen = tiposExamenes.some((t) => TIPOS_IMAGEN.includes(t));
+  const tieneLab    = tiposExamenes.some((t) => TIPOS_LAB.includes(t) || t === "OTRO");
+  if (tieneImagen && tieneLab) return "MIXTA";
+  if (tieneImagen) return "IMAGEN";
+  return "LABORATORIO";
+}
+
 // ─────────────────────────────────────────────────────────────
 // CATÁLOGO DE EXÁMENES DE LABORATORIO
 // ─────────────────────────────────────────────────────────────
@@ -171,20 +191,33 @@ export const crearOrden = async (req: AuthRequest, res: Response) => {
 
     const codigoOrden = await generarCodigoOrden();
 
+    // Detectar tipo de orden y seccion por ítem según los exámenes solicitados
+    const examenesIds = items.map((i: any) => i.examenId);
+    const examenesData = await ExamenLaboratorioImagen.find({ _id: { $in: examenesIds } }).select("tipo");
+    const examenMap = new Map(examenesData.map((e) => [String(e._id), e.tipo]));
+    const tiposExamenes = examenesData.map((e) => e.tipo);
+    const tipoOrden = detectarTipoOrden(tiposExamenes);
+
     const orden = await OrdenExamen.create({
       pacienteId,
       doctorId: medicoId,
       citaId: citaId || undefined,
       especialidadId,
       codigoOrden,
-      items: items.map((item: any) => ({
-        examenId: item.examenId,
-        observaciones: item.observaciones || "",
-        respuestasProtocolares: Array.isArray(item.respuestasProtocolares)
-          ? item.respuestasProtocolares
-          : [],
-        estadoItem: "PENDIENTE",
-      })),
+      tipoOrden,
+      items: items.map((item: any) => {
+        const tipo = examenMap.get(String(item.examenId)) ?? "";
+        const seccion: "LAB" | "IMAGEN" = TIPOS_IMAGEN.includes(tipo) ? "IMAGEN" : "LAB";
+        return {
+          examenId: item.examenId,
+          seccion,
+          observaciones: item.observaciones || "",
+          respuestasProtocolares: Array.isArray(item.respuestasProtocolares)
+            ? item.respuestasProtocolares
+            : [],
+          estadoItem: "PENDIENTE",
+        };
+      }),
       observacionesGenerales: observacionesGenerales || "",
       estado: "PENDIENTE",
     });
@@ -209,11 +242,27 @@ export const crearOrden = async (req: AuthRequest, res: Response) => {
   }
 };
 
+// Convierte "DD/MM/YYYY HH:mm" o ISO a Date. Lanza si es inválido.
+function parseFecha(valor: string): Date {
+  // Formato DD/MM/YYYY o DD/MM/YYYY HH:mm
+  const matchDMY = valor.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?$/);
+  if (matchDMY) {
+    const [, d, m, y, hh = "00", mm = "00"] = matchDMY;
+    return new Date(`${y}-${m}-${d}T${hh}:${mm}:00.000Z`);
+  }
+  // Fallback ISO
+  const fecha = new Date(valor);
+  if (isNaN(fecha.getTime())) throw new Error("Fecha inválida");
+  return fecha;
+}
+
 // ── Autorizar orden (recepción) — PENDIENTE → EN_PROCESO ──
+// Para LABORATORIO: body { fechaCitaLab: "DD/MM/YYYY" }
+// Para IMAGEN:      body { citaImagenFecha: "DD/MM/YYYY HH:mm", salaEquipo: "Sala 1", duracionEstimadaMin: 30 }
 export const autorizarOrden = async (req: AuthRequest, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { fechaCitaLab } = req.body; // "YYYY-MM-DD" — día agendado para la toma de muestra
+    const { fechaCitaLab, citaImagenFecha, salaEquipo, duracionEstimadaMin } = req.body;
 
     const orden = await OrdenExamen.findById(id);
     if (!orden)
@@ -226,36 +275,101 @@ export const autorizarOrden = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Validar y reservar cupo para la fecha de cita de laboratorio
-    let citaLabDate: Date | undefined;
-    if (fechaCitaLab) {
-      citaLabDate = new Date(`${fechaCitaLab}T00:00:00.000Z`);
-      if (isNaN(citaLabDate.getTime())) {
-        return res.status(400).json({ success: false, message: "Fecha de cita inválida." });
+    const tipoOrden = orden.tipoOrden;
+    const necesitaLab    = tipoOrden === "LABORATORIO" || tipoOrden === "MIXTA";
+    const necesitaImagen = tipoOrden === "IMAGEN"      || tipoOrden === "MIXTA";
+
+    // ── Validar campos requeridos según tipo ──
+    if (necesitaLab && !fechaCitaLab) {
+      return res.status(400).json({
+        success: false,
+        message: "Se requiere fechaCitaLab (DD/MM/YYYY) para los exámenes de laboratorio",
+      });
+    }
+    if (necesitaImagen && !citaImagenFecha) {
+      return res.status(400).json({
+        success: false,
+        message: "Se requiere citaImagenFecha (DD/MM/YYYY HH:mm) para los exámenes de imagenología",
+      });
+    }
+
+    const ahora = new Date();
+
+    // ── Procesar parte LAB ──
+    if (necesitaLab) {
+      let citaLabDate: Date;
+      try {
+        citaLabDate = parseFecha(fechaCitaLab);
+      } catch {
+        return res.status(400).json({ success: false, message: "fechaCitaLab inválida. Use DD/MM/YYYY" });
       }
-      // Verificar cupos disponibles para ese día
-      const startOfDay = new Date(`${fechaCitaLab}T00:00:00.000Z`);
-      const endOfDay   = new Date(`${fechaCitaLab}T23:59:59.999Z`);
+      citaLabDate = new Date(`${citaLabDate.toISOString().slice(0, 10)}T00:00:00.000Z`);
+
+      const startOfDay = citaLabDate;
+      const endOfDay   = new Date(`${citaLabDate.toISOString().slice(0, 10)}T23:59:59.999Z`);
       const ocupados = await OrdenExamen.countDocuments({
         fechaCitaLab: { $gte: startOfDay, $lte: endOfDay },
         estado: { $in: ["EN_PROCESO", "ASISTIDO", "FINALIZADO"] },
       });
       if (ocupados >= CAPACIDAD_DIARIA_LAB) {
+        const d = citaLabDate;
+        const f = `${d.getUTCDate().toString().padStart(2,"0")}/${(d.getUTCMonth()+1).toString().padStart(2,"0")}/${d.getUTCFullYear()}`;
         return res.status(400).json({
           success: false,
-          message: `No hay cupos disponibles para el ${fechaCitaLab}. El laboratorio alcanzó su capacidad máxima de ${CAPACIDAD_DIARIA_LAB} pacientes para ese día.`,
+          message: `No hay cupos de laboratorio para el ${f}. Capacidad máxima: ${CAPACIDAD_DIARIA_LAB} pacientes.`,
         });
       }
+
+      orden.fechaCitaLab = citaLabDate;
     }
 
-    const ahora = new Date();
+    // ── Procesar parte IMAGEN ──
+    if (necesitaImagen) {
+      let fechaImagen: Date;
+      try {
+        fechaImagen = parseFecha(citaImagenFecha);
+      } catch {
+        return res.status(400).json({ success: false, message: "citaImagenFecha inválida. Use DD/MM/YYYY HH:mm" });
+      }
+
+      const duracion = duracionEstimadaMin ?? 30;
+      const fechaFin = new Date(fechaImagen.getTime() + duracion * 60_000);
+
+      if (salaEquipo) {
+        const conflicto = await OrdenExamen.findOne({
+          tipoOrden: { $in: ["IMAGEN", "MIXTA"] },
+          salaEquipo,
+          estado: { $in: ["EN_PROCESO", "ASISTIDO", "FINALIZADO"] },
+          citaImagenFecha: { $lt: fechaFin },
+          $expr: {
+            $gt: [
+              { $add: ["$citaImagenFecha", { $multiply: [{ $ifNull: ["$duracionEstimadaMin", 30] }, 60_000] }] },
+              fechaImagen,
+            ],
+          },
+        });
+        if (conflicto) {
+          return res.status(400).json({
+            success: false,
+            message: `La sala/equipo "${salaEquipo}" ya tiene una cita programada en ese horario.`,
+          });
+        }
+        orden.salaEquipo = salaEquipo;
+      }
+
+      orden.citaImagenFecha = fechaImagen;
+      orden.duracionEstimadaMin = duracion;
+    }
+
+    // ── Vencimiento: el más largo entre los dos flujos ──
+    const diasVencimiento = necesitaImagen ? 30 : 7;
     const fechaVencimiento = new Date(ahora);
-    fechaVencimiento.setDate(fechaVencimiento.getDate() + 7);
+    fechaVencimiento.setDate(fechaVencimiento.getDate() + diasVencimiento);
 
     orden.estado = "EN_PROCESO";
     orden.fechaAutorizacion = ahora;
     orden.fechaVencimiento = fechaVencimiento;
-    if (citaLabDate) orden.fechaCitaLab = citaLabDate;
+
     await orden.save();
 
     const ordenActualizada = await OrdenExamen.findById(id)
@@ -270,7 +384,7 @@ export const autorizarOrden = async (req: AuthRequest, res: Response) => {
       req.user?.userId ?? "desconocido",
       "autorizar_orden",
       id,
-      { fechaAutorizacion: ahora, fechaVencimiento },
+      { fechaAutorizacion: orden.fechaAutorizacion, fechaVencimiento: orden.fechaVencimiento },
       req.ip as string | undefined,
       { estadoAnterior: "PENDIENTE", estadoNuevo: "EN_PROCESO" }
     );
@@ -531,7 +645,7 @@ export const procesarVencidas = async (req: Request, res: Response) => {
 // ── Listar órdenes por estado ──
 export const listarOrdenesPorEstado = async (req: Request, res: Response) => {
   try {
-    const { estado } = req.query;
+    const { estado, tipoOrden } = req.query;
     const estadosValidos = [
       "PENDIENTE",
       "EN_PROCESO",
@@ -545,6 +659,10 @@ export const listarOrdenesPorEstado = async (req: Request, res: Response) => {
       estado && estadosValidos.includes(estado as string)
         ? { estado }
         : { estado: { $in: ["PENDIENTE", "EN_PROCESO"] } };
+
+    if (tipoOrden && ["LABORATORIO", "IMAGEN", "MIXTA"].includes(tipoOrden as string)) {
+      filtro.tipoOrden = tipoOrden;
+    }
 
     const ordenes = await OrdenExamen.find(filtro)
       .populate("pacienteId", "nombres apellidos dni")
@@ -562,7 +680,7 @@ export const listarOrdenesPorEstado = async (req: Request, res: Response) => {
 // ── Listar órdenes pendientes (compatibilidad) ──
 export const listarOrdenesPendientes = async (req: Request, res: Response) => {
   try {
-    const { todos, estado } = req.query;
+    const { todos, estado, tipoOrden } = req.query;
     const estadosValidos = [
       "PENDIENTE",
       "EN_PROCESO",
@@ -579,6 +697,10 @@ export const listarOrdenesPendientes = async (req: Request, res: Response) => {
       filtro = { estado };
     } else {
       filtro = { estado: { $in: ["PENDIENTE", "EN_PROCESO"] } };
+    }
+
+    if (tipoOrden && ["LABORATORIO", "IMAGEN", "MIXTA"].includes(tipoOrden as string)) {
+      filtro.tipoOrden = tipoOrden;
     }
 
     const ordenes = await OrdenExamen.find(filtro)
@@ -876,6 +998,94 @@ export const cargarResultados = async (
       .populate("items.examenId", "nombre tipo instrucciones preguntasProtocolares");
 
     res.json({ success: true, data: ordenActualizada });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Horario laboral de imagenología: 08:00–17:00 UTC
+const IMAGEN_INICIO_H = 8;
+const IMAGEN_FIN_H    = 17;
+
+// ── Disponibilidad de imagenología por sala/día ──
+// Query: fecha (DD/MM/YYYY), salaEquipo (opcional), duracionMin (número)
+// Retorna franjas ocupadas Y horarios libres sugeridos para esa sala
+export const obtenerDisponibilidadImagen = async (req: Request, res: Response) => {
+  try {
+    const { fecha, salaEquipo, duracionMin } = req.query;
+
+    if (!fecha) {
+      return res.status(400).json({ success: false, message: "Parámetro fecha requerido (DD/MM/YYYY)" });
+    }
+
+    let fechaBase: Date;
+    try {
+      fechaBase = parseFecha(fecha as string);
+    } catch {
+      return res.status(400).json({ success: false, message: "Fecha inválida. Use DD/MM/YYYY" });
+    }
+
+    const isoFecha = fechaBase.toISOString().slice(0, 10); // YYYY-MM-DD
+    const startOfDay = new Date(`${isoFecha}T00:00:00.000Z`);
+    const endOfDay   = new Date(`${isoFecha}T23:59:59.999Z`);
+
+    const filtro: any = {
+      tipoOrden: { $in: ["IMAGEN", "MIXTA"] },
+      citaImagenFecha: { $gte: startOfDay, $lte: endOfDay },
+      estado: { $in: ["EN_PROCESO", "ASISTIDO", "FINALIZADO"] },
+    };
+    if (salaEquipo) filtro.salaEquipo = salaEquipo as string;
+
+    const citas = await OrdenExamen.find(filtro)
+      .select("citaImagenFecha duracionEstimadaMin salaEquipo estado")
+      .populate("pacienteId", "nombres apellidos")
+      .sort({ citaImagenFecha: 1 });
+
+    const franjas = citas.map((c) => ({
+      ordenId: c._id,
+      paciente: c.pacienteId,
+      salaEquipo: c.salaEquipo,
+      inicio: c.citaImagenFecha,
+      fin: c.citaImagenFecha
+        ? new Date(c.citaImagenFecha.getTime() + (c.duracionEstimadaMin ?? 30) * 60_000)
+        : null,
+      duracionMin: c.duracionEstimadaMin ?? 30,
+      estado: c.estado,
+    }));
+
+    // Calcular slots libres sugeridos para esa sala en el día
+    const duracion = Number(duracionMin) || 30;
+    const slotsLibres: string[] = [];
+    if (salaEquipo) {
+      const franjasOrdenadas = franjas.filter((f) => f.salaEquipo === salaEquipo && f.inicio && f.fin);
+      let cursor = new Date(`${isoFecha}T${String(IMAGEN_INICIO_H).padStart(2, "0")}:00:00.000Z`);
+      const fin = new Date(`${isoFecha}T${String(IMAGEN_FIN_H).padStart(2, "0")}:00:00.000Z`);
+
+      while (cursor.getTime() + duracion * 60_000 <= fin.getTime()) {
+        const slotFin = new Date(cursor.getTime() + duracion * 60_000);
+        const ocupado = franjasOrdenadas.some(
+          (f) => f.inicio! < slotFin && f.fin! > cursor
+        );
+        if (!ocupado) {
+          // Formato DD/MM/YYYY HH:mm (hora local UTC)
+          const hh = String(cursor.getUTCHours()).padStart(2, "0");
+          const mm = String(cursor.getUTCMinutes()).padStart(2, "0");
+          const dd = String(cursor.getUTCDate()).padStart(2, "0");
+          const mo = String(cursor.getUTCMonth() + 1).padStart(2, "0");
+          const yy = cursor.getUTCFullYear();
+          slotsLibres.push(`${dd}/${mo}/${yy} ${hh}:${mm}`);
+        }
+        cursor = new Date(cursor.getTime() + 30 * 60_000); // avanzar de 30 en 30 min
+      }
+    }
+
+    res.json({
+      success: true,
+      fecha,
+      duracionesPorModalidad: DURACION_DEFAULT,
+      franjasOcupadas: franjas,
+      slotsLibres,
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

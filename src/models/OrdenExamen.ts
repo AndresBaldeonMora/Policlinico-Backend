@@ -8,6 +8,7 @@ export interface IRespuestaProtocolar {
 
 export interface IItemOrden {
   examenId: mongoose.Types.ObjectId;
+  seccion: "LAB" | "IMAGEN";   // qué módulo procesa este ítem
   observaciones?: string;
   respuestasProtocolares: IRespuestaProtocolar[];
   valorResultado?: string;
@@ -25,6 +26,8 @@ export type EstadoOrdenExamen =
   | "CANCELADA"
   | "VENCIDA";
 
+export type TipoOrden = "LABORATORIO" | "IMAGEN" | "MIXTA";
+
 export interface IOrdenExamen extends Document {
   _id: mongoose.Types.ObjectId;
   pacienteId: mongoose.Types.ObjectId;
@@ -32,13 +35,18 @@ export interface IOrdenExamen extends Document {
   citaId?: mongoose.Types.ObjectId;
   especialidadId: mongoose.Types.ObjectId;
   codigoOrden: string;
+  tipoOrden: TipoOrden;
   // Ciclo de vida de la orden
   fecha: Date;
-  fechaAutorizacion?: Date;   // Cuando recepción autoriza la orden
-  fechaCitaLab?: Date;        // Día agendado para la toma de muestra
-  fechaVencimiento?: Date;    // fechaAutorizacion + 7 días
-  fechaAsistencia?: Date;     // Cuando el paciente se presenta al laboratorio
-  fechaResultados?: Date;     // Cuando el laboratorio carga los resultados
+  fechaAutorizacion?: Date;      // Cuando recepción autoriza la orden
+  fechaCitaLab?: Date;           // Día agendado para toma de muestra (laboratorio)
+  fechaVencimiento?: Date;       // fechaAutorizacion + 7 días
+  fechaAsistencia?: Date;        // Cuando el paciente se presenta
+  fechaResultados?: Date;        // Cuando el laboratorio/imagen carga resultados
+  // Campos específicos de imagenología
+  citaImagenFecha?: Date;        // Fecha + hora exacta para cita de imagen
+  duracionEstimadaMin?: number;  // Duración estimada del estudio en minutos
+  salaEquipo?: string;           // Sala o equipo asignado
   // Resultado global (PDF de la orden completa)
   archivoResultadoUrl?: string;
   // Campos heredados / compatibilidad
@@ -61,6 +69,12 @@ const respuestaProtocolarSchema = new Schema<IRespuestaProtocolar>(
 const itemOrdenSchema = new Schema<IItemOrden>(
   {
     examenId: { type: Schema.Types.ObjectId, ref: "ExamenLaboratorioImagen", required: true },
+    seccion: {
+      type: String,
+      enum: ["LAB", "IMAGEN"],
+      required: true,
+      default: "LAB",
+    },
     observaciones:           { type: String, trim: true, default: "" },
     respuestasProtocolares:  { type: [respuestaProtocolarSchema], default: [] },
     valorResultado:          { type: String, trim: true },
@@ -83,6 +97,11 @@ const ordenExamenSchema = new Schema<IOrdenExamen>(
     citaId:         { type: Schema.Types.ObjectId, ref: "Cita" },
     especialidadId: { type: Schema.Types.ObjectId, ref: "Especialidad",     required: true },
     codigoOrden:    { type: String, unique: true, sparse: true },
+    tipoOrden: {
+      type: String,
+      enum: ["LABORATORIO", "IMAGEN", "MIXTA"],
+      default: "LABORATORIO",
+    },
     fecha:          { type: Date, required: true, default: () => new Date() },
     // Ciclo de vida
     fechaAutorizacion:  { type: Date },
@@ -90,6 +109,10 @@ const ordenExamenSchema = new Schema<IOrdenExamen>(
     fechaVencimiento:   { type: Date },
     fechaAsistencia:    { type: Date },
     fechaResultados:    { type: Date },
+    // Imagenología
+    citaImagenFecha:      { type: Date },
+    duracionEstimadaMin:  { type: Number, min: 1 },
+    salaEquipo:           { type: String, trim: true },
     archivoResultadoUrl:{ type: String, trim: true },
     // Compatibilidad
     citaLabId:          { type: Schema.Types.ObjectId, ref: "Cita" },

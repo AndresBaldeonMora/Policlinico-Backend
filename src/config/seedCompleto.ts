@@ -349,51 +349,82 @@ async function seedCompleto() {
       citas.push(cita);
     }
 
-    await Cita.insertMany(citas);
-    console.log(`✅ ${citas.length} citas creadas en diferentes estados`);
+    const citasResult = await Cita.insertMany(citas, { ordered: false }).catch((e: any) => {
+      if (e.code === 11000) return { length: e.result?.insertedCount ?? 0 };
+      throw e;
+    });
+    const citasInsertadas = Array.isArray(citasResult) ? citasResult.length : (citasResult as any).insertedCount ?? (citasResult as any).length ?? 0;
+    console.log(`✅ ~${citasInsertadas} citas creadas en diferentes estados (duplicados omitidos)`);
 
     // CREAR ÓRDENES DE EXAMEN
+    const TIPOS_IMAGEN_SEED = ["RADIOGRAFIA", "ECOGRAFIA", "TOMOGRAFIA", "RESONANCIA", "ELECTROCARDIOGRAMA"];
+    const DURACION_SEED: Record<string, number> = {
+      RADIOGRAFIA: 15, ECOGRAFIA: 30, TOMOGRAFIA: 30, RESONANCIA: 60, ELECTROCARDIOGRAMA: 20,
+    };
+    const salas = ["Sala Rayos X", "Sala Ecografía", "Sala TC", "Sala RMN", "Sala ECG"];
+
     const ordenes: any[] = [];
     for (let i = 0; i < 40; i++) {
       const paciente = pacientesCreados[Math.floor(Math.random() * pacientesCreados.length)];
       const doctor = doctoresCreados[Math.floor(Math.random() * doctoresCreados.length)];
       const especialidad = especialidadesCreadas[Math.floor(Math.random() * especialidadesCreadas.length)];
-      const estados = ["PENDIENTE", "EN_PROCESO", "ASISTIDO", "FINALIZADO", "CANCELADA"];
-      const estado = estados[Math.floor(Math.random() * estados.length)];
+      const estadosOrd = ["PENDIENTE", "EN_PROCESO", "ASISTIDO", "FINALIZADO", "CANCELADA"];
+      const estado = estadosOrd[Math.floor(Math.random() * estadosOrd.length)];
 
       const examen = examenesCreados[Math.floor(Math.random() * examenesCreados.length)];
       const ahora = new Date();
+      const esImagen = TIPOS_IMAGEN_SEED.includes(examen.tipo);
+      const tipoOrden = esImagen ? "IMAGEN" : "LABORATORIO";
 
       const orden: any = {
         pacienteId: paciente._id,
         doctorId: doctor._id,
         especialidadId: especialidad._id,
         codigoOrden: `ORD-${ahora.getTime()}-${i}`,
+        tipoOrden,
         fecha: restarDias(ahora, Math.floor(Math.random() * 10)),
         items: [
           {
             examenId: examen._id,
+            seccion: esImagen ? "IMAGEN" : "LAB",
             estadoItem: estado === "FINALIZADO" ? "COMPLETADO" : "PENDIENTE",
             observaciones: "Orden de examen rutinario",
           },
         ],
-        estado: estado,
+        estado,
         observacionesGenerales: "Orden creada para seguimiento médico",
       };
 
       if (estado === "EN_PROCESO" || estado === "ASISTIDO" || estado === "FINALIZADO") {
         orden.fechaAutorizacion = restarDias(ahora, Math.floor(Math.random() * 5));
-        orden.fechaCitaLab = new Date(orden.fechaAutorizacion);
-        orden.fechaCitaLab.setDate(orden.fechaCitaLab.getDate() + Math.floor(Math.random() * 5));
+
+        if (esImagen) {
+          // Imagenología: fecha + hora exacta
+          const fechaImagen = new Date(orden.fechaAutorizacion);
+          fechaImagen.setDate(fechaImagen.getDate() + Math.floor(Math.random() * 7) + 1);
+          fechaImagen.setHours(8 + Math.floor(Math.random() * 8), [0, 30][Math.floor(Math.random() * 2)], 0, 0);
+          const duracion = DURACION_SEED[examen.tipo] ?? 30;
+          orden.citaImagenFecha = fechaImagen;
+          orden.duracionEstimadaMin = duracion;
+          orden.salaEquipo = salas[Math.floor(Math.random() * salas.length)];
+          orden.fechaVencimiento = new Date(orden.fechaAutorizacion);
+          orden.fechaVencimiento.setDate(orden.fechaVencimiento.getDate() + 30);
+        } else {
+          // Laboratorio: solo fecha (mañana, 7–11 a.m.)
+          orden.fechaCitaLab = new Date(orden.fechaAutorizacion);
+          orden.fechaCitaLab.setDate(orden.fechaCitaLab.getDate() + Math.floor(Math.random() * 5));
+          orden.fechaVencimiento = new Date(orden.fechaAutorizacion);
+          orden.fechaVencimiento.setDate(orden.fechaVencimiento.getDate() + 7);
+        }
       }
 
       if (estado === "ASISTIDO" || estado === "FINALIZADO") {
-        orden.fechaAsistencia = orden.fechaCitaLab;
+        orden.fechaAsistencia = esImagen ? orden.citaImagenFecha : orden.fechaCitaLab;
       }
 
       if (estado === "FINALIZADO") {
         orden.items[0].estadoItem = "COMPLETADO";
-        orden.fechaResultados = new Date(orden.fechaAsistencia);
+        orden.fechaResultados = new Date(orden.fechaAsistencia ?? ahora);
         orden.fechaResultados.setDate(orden.fechaResultados.getDate() + 1);
         orden.items[0].valorResultado = Math.floor(Math.random() * 200).toString();
         orden.items[0].unidadResultado = "g/dL";
@@ -403,7 +434,7 @@ async function seedCompleto() {
     }
 
     await OrdenExamen.insertMany(ordenes);
-    console.log(`✅ ${ordenes.length} órdenes de examen creadas`);
+    console.log(`✅ ${ordenes.length} órdenes de examen creadas (LAB + IMAGEN)`);
 
     console.log("\n📊 RESUMEN DEL SEED:");
     console.log(`   • Especialidades: ${especialidadesCreadas.length}`);
