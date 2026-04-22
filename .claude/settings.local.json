@@ -4,7 +4,9 @@
       "Read(//c/Users/andre/Documents/GitHub/proyecto-policlinico/**)",
       "Bash(npx tsc:*)",
       "Bash(python:*)",
-      "Bash(node_modules/.bin/tsc --noEmit)"
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "WebSearch",
+      "Bash(npm run *)"
     ]
   }
 }

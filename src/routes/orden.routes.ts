@@ -18,6 +18,7 @@ import {
   finalizarOrden,
   procesarVencidas,
   obtenerDisponibilidadLab,
+  obtenerDisponibilidadImagen,
 } from "../controllers/examen.controller";
 import { verifyToken, requireRole } from "../middlewares/authMiddlewares";
 import { upload } from "../config/cloudinary";
@@ -31,6 +32,8 @@ router.get("/pendientes",                 listarOrdenesPendientes);
 router.get("/buscar",                     buscarOrdenPorCodigo);
 // Disponibilidad del laboratorio por día (para selector de fecha en "Generar Orden")
 router.get("/disponibilidad-lab",         obtenerDisponibilidadLab);
+// Disponibilidad de imagenología por sala y día (para reserva de cita con hora exacta)
+router.get("/disponibilidad-imagen",      obtenerDisponibilidadImagen);
 router.get("/paciente/:pacienteId",       listarOrdenesPorPaciente);
 router.get("/cita/:citaId",               listarOrdenesPorCita);
 router.get("/:id",                        obtenerOrden);
