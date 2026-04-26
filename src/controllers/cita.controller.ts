@@ -271,3 +271,207 @@ export const cambiarEstado = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: "Error al cambiar estado", error: error.message });
   }
 };
+
+// ─────────────────────────────────────────────────────────────
+// HISTORIAL DE CITAS DEL PACIENTE
+// ─────────────────────────────────────────────────────────────
+//
+// ⚠️  SOLUCIÓN TEMPORAL — Por incompatibilidad de IDs
+//
+// El usuario autenticado viene de Supabase con UUID format
+// (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx), que NO coincide con
+// el ObjectId de MongoDB del modelo Paciente.
+//
+// SOLUCIÓN PENDIENTE (cuando se resuelva la integración de IDs):
+//   const pacienteId = (req as any).user?.id;
+//   const citas = await Cita.find({ pacienteId }).populate(...);
+//
+// SOLUCIÓN ACTUAL: se recibe el correo, se busca el Paciente en
+// Mongo por correo y se usa su _id real para filtrar las citas.
+// ─────────────────────────────────────────────────────────────
+
+export const obtenerHistorialCitas = async (req: Request, res: Response) => {
+  try {
+    const correo: string | undefined =
+      (req.query.correo as string) || req.body.correo;
+
+    if (!correo) {
+      return res.status(400).json({
+        success: false,
+        message: "Se requiere el correo del paciente",
+      });
+    }
+
+    const paciente = await Paciente.findOne({
+      correo: correo.toLowerCase().trim(),
+    }).lean();
+
+    if (!paciente) {
+      return res.status(404).json({
+        success: false,
+        message: "No se encontró un paciente con ese correo",
+      });
+    }
+
+    const { especialidad, medicoNombre, fechaDesde, fechaHasta } = req.query;
+
+    const filtro: any = { pacienteId: paciente._id };
+
+    if (fechaDesde || fechaHasta) {
+      filtro.fecha = {};
+      if (fechaDesde) {
+        const [y, m, d] = (fechaDesde as string).split("-").map(Number);
+        filtro.fecha.$gte = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
+      }
+      if (fechaHasta) {
+        const [y, m, d] = (fechaHasta as string).split("-").map(Number);
+        filtro.fecha.$lte = new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999));
+      }
+    }
+
+    const citas = await Cita.find(filtro)
+      .populate("pacienteId", "nombres apellidos dni telefono correo")
+      .populate({
+        path: "doctorId",
+        select: "nombres apellidos especialidadId",
+        populate: { path: "especialidadId", select: "nombre" },
+      })
+      .sort({ fecha: -1, hora: -1 })
+      .lean();
+
+    // Post-filtros en memoria porque dependen del populate resuelto
+    let citasFiltradas = citas;
+
+    if (especialidad) {
+      const esp = (especialidad as string).toLowerCase();
+      citasFiltradas = citasFiltradas.filter((c) => {
+        const doctor = c.doctorId as any;
+        return doctor?.especialidadId?.nombre?.toLowerCase().includes(esp);
+      });
+    }
+
+    if (medicoNombre) {
+      const med = (medicoNombre as string).toLowerCase();
+      citasFiltradas = citasFiltradas.filter((c) => {
+        const doctor = c.doctorId as any;
+        if (!doctor) return false;
+        return `${doctor.nombres} ${doctor.apellidos}`.toLowerCase().includes(med);
+      });
+    }
+
+    const historial = citasFiltradas.map((cita) => {
+      const doctor = cita.doctorId as any;
+      return {
+        _id: cita._id,
+        fecha: new Date(cita.fecha).toLocaleDateString("es-PE", {
+          day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC",
+        }),
+        fechaRaw: cita.fecha,
+        hora: cita.hora || null,
+        tipo: cita.tipo,
+        estado: cita.estado,
+        doctor: doctor ? `${doctor.nombres} ${doctor.apellidos}`.trim() : "Sin asignar",
+        doctorId: doctor?._id || null,
+        especialidad: doctor?.especialidadId?.nombre || "Sin especialidad",
+        diagnostico: cita.diagnostico || null,
+        tratamiento: cita.tratamiento || null,
+        notasClinicas: cita.notasClinicas || null,
+        medicamentosPrescritos: cita.medicamentosPrescritos?.length
+          ? cita.medicamentosPrescritos.map((m: any) => ({
+              nombre: m.nombre,
+              dosis: m.dosis,
+              frecuencia: m.frecuencia,
+              duracion: m.duracion,
+              observaciones: m.observaciones || null,
+            }))
+          : [],
+        instrucciones: cita.instrucciones || null,
+        motivoCancelacion: cita.motivoCancelacion || null,
+      };
+    });
+
+    return res.json({
+      success: true,
+      total: historial.length,
+      paciente: {
+        _id: paciente._id,
+        nombre: `${(paciente as any).nombres} ${(paciente as any).apellidos}`.trim(),
+        correo: (paciente as any).correo,
+      },
+      data: historial,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      message: "Error al obtener el historial de citas",
+      error: error.message,
+    });
+  }
+};
+
+export const obtenerDetalleCitaHistorial = async (req: Request, res: Response) => {
+  try {
+    const cita = await Cita.findById(req.params.id)
+      .populate("pacienteId", "nombres apellidos dni telefono correo")
+      .populate({
+        path: "doctorId",
+        select: "nombres apellidos especialidadId",
+        populate: { path: "especialidadId", select: "nombre" },
+      })
+      .lean();
+
+    if (!cita) {
+      return res.status(404).json({ success: false, message: "Cita no encontrada" });
+    }
+
+    const doctor  = cita.doctorId as any;
+    const paciente = cita.pacienteId as any;
+
+    return res.json({
+      success: true,
+      data: {
+        _id: cita._id,
+        fecha: new Date(cita.fecha).toLocaleDateString("es-PE", {
+          day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC",
+        }),
+        fechaRaw: cita.fecha,
+        hora: cita.hora || null,
+        tipo: cita.tipo,
+        estado: cita.estado,
+        paciente: {
+          _id: paciente?._id,
+          nombre: paciente ? `${paciente.nombres} ${paciente.apellidos}`.trim() : "—",
+          dni: paciente?.dni || "—",
+          telefono: paciente?.telefono || null,
+          correo: paciente?.correo || null,
+        },
+        doctor: {
+          _id: doctor?._id || null,
+          nombre: doctor ? `${doctor.nombres} ${doctor.apellidos}`.trim() : "Sin asignar",
+          especialidad: doctor?.especialidadId?.nombre || "Sin especialidad",
+        },
+        diagnostico: cita.diagnostico || null,
+        tratamiento: cita.tratamiento || null,
+        notasClinicas: cita.notasClinicas || null,
+        medicamentosPrescritos: cita.medicamentosPrescritos?.length
+          ? cita.medicamentosPrescritos.map((m: any) => ({
+              nombre: m.nombre,
+              dosis: m.dosis,
+              frecuencia: m.frecuencia,
+              duracion: m.duracion,
+              observaciones: m.observaciones || null,
+            }))
+          : [],
+        instrucciones: cita.instrucciones || null,
+        motivoCancelacion: cita.motivoCancelacion || null,
+        horarioAsistencia: cita.horarioAsistencia || null,
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      message: "Error al obtener el detalle de la cita",
+      error: error.message,
+    });
+  }
+};
