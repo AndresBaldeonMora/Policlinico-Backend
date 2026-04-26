@@ -8,7 +8,6 @@ export interface IDoctor extends Document {
   telefono: string;
   especialidadId: mongoose.Types.ObjectId;
   cmp?: string;
-  supabaseId?: string;
 }
 
 const doctorSchema = new Schema<IDoctor>(
@@ -19,7 +18,6 @@ const doctorSchema = new Schema<IDoctor>(
     telefono:       { type: String, required: true, trim: true, unique: true },
     especialidadId: { type: Schema.Types.ObjectId, ref: "Especialidad", required: true },
     cmp:            { type: String, trim: true, default: "" },
-    supabaseId:     { type: String, trim: true, default: "" },
   },
   { timestamps: true }
 );

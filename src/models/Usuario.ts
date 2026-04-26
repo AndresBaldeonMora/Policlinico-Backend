@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document } from "mongoose";
 
-export type RolUsuario = "RECEPCIONISTA" | "MEDICO";
+export type RolUsuario = "RECEPCIONISTA" | "MEDICO" | "PACIENTE" | "ADMINISTRADOR";
 
 export interface IUsuario extends Document {
   nombres: string;
@@ -8,8 +8,8 @@ export interface IUsuario extends Document {
   correo: string;
   passwordHash: string;
   rol: RolUsuario;
-  // ✅ AGREGAMOS ESTO: Para vincular al médico
-  medicoId?: mongoose.Types.ObjectId; 
+  medicoId?: mongoose.Types.ObjectId;
+  pacienteId?: mongoose.Types.ObjectId;
 }
 
 const usuarioSchema = new Schema<IUsuario>(
@@ -20,14 +20,18 @@ const usuarioSchema = new Schema<IUsuario>(
     passwordHash: { type: String, required: true },
     rol: {
       type: String,
-      enum: ["RECEPCIONISTA", "MEDICO"],
+      enum: ["RECEPCIONISTA", "MEDICO", "PACIENTE", "ADMINISTRADOR"],
       required: true,
     },
-    // ✅ AGREGAMOS ESTO AL SCHEMA
     medicoId: {
       type: Schema.Types.ObjectId,
       ref: "Doctor",
-      required: false, // Es opcional porque el Recepcionista no lo tiene
+      required: false,
+    },
+    pacienteId: {
+      type: Schema.Types.ObjectId,
+      ref: "Paciente",
+      required: false,
     },
   },
   { timestamps: true }

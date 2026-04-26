@@ -71,7 +71,7 @@ export const crearDoctor = async (req: Request, res: Response) => {
   try {
     const error = validarDoctor(req.body);
     if (error) return res.status(400).json({ success: false, message: error });
-    const { nombres, apellidos, correo, telefono, especialidadId, cmp, supabaseId } = req.body;
+    const { nombres, apellidos, correo, telefono, especialidadId, cmp } = req.body;
 
     // Verificar duplicados 
     const [correoExiste, telefonoExiste] = await Promise.all([
@@ -81,7 +81,7 @@ export const crearDoctor = async (req: Request, res: Response) => {
     if (correoExiste)   return res.status(400).json({ success: false, message: "Ya existe un doctor con ese correo" });
     if (telefonoExiste) return res.status(400).json({ success: false, message: "Ya existe un doctor con ese teléfono" });
 
-    const doctor = await Doctor.create({ nombres, apellidos, correo, telefono, especialidadId, cmp, supabaseId });
+    const doctor = await Doctor.create({ nombres, apellidos, correo, telefono, especialidadId, cmp });
     const populated = await doctor.populate("especialidadId", "nombre");
     res.status(201).json({ success: true, data: populated });
   } catch (error: any) {

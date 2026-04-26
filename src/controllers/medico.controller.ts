@@ -3,19 +3,14 @@ import { Cita } from "../models/Cita";
 import { Doctor } from "../models/Doctor";
 import { AuthRequest } from "../middlewares/authMiddlewares";
 
-const getDoctorId = async (req: Request): Promise<string | null> => {
+const getDoctorId = (req: Request): string | null => {
   const user = (req as AuthRequest).user;
-  if (!user) return null;
-
-  if (user.medicoId) return user.medicoId;
-
-  const doctor = await Doctor.findOne({ supabaseId: user.userId }).select("_id");
-  return doctor ? doctor._id.toString() : null;
+  return user?.medicoId ?? null;
 };
 
 export const obtenerMiPerfil = async (req: Request, res: Response) => {
   try {
-    const doctorId = await getDoctorId(req);
+    const doctorId = getDoctorId(req);
     if (!doctorId) {
       return res.status(403).json({ success: false, message: "Usuario no vinculado a un perfil médico" });
     }
@@ -33,7 +28,7 @@ export const obtenerMiPerfil = async (req: Request, res: Response) => {
 
 export const obtenerMisCitas = async (req: Request, res: Response) => {
   try {
-    const doctorId = await getDoctorId(req);
+    const doctorId = getDoctorId(req);
     if (!doctorId) {
       return res.status(403).json({ success: false, message: "No autorizado" });
     }
@@ -50,7 +45,7 @@ export const obtenerMisCitas = async (req: Request, res: Response) => {
 
 export const obtenerCitasHoy = async (req: Request, res: Response) => {
   try {
-    const doctorId = await getDoctorId(req);
+    const doctorId = getDoctorId(req);
     if (!doctorId) {
       return res.status(403).json({ success: false, message: "No autorizado" });
     }

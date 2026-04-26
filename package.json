@@ -11,6 +11,7 @@
     "seed:examenes": "ts-node src/config/seedExamenes.ts",
     "seed:ordenes": "ts-node src/config/seedOrdenes.ts",
     "seed:citas": "ts-node src/config/seedCitas.ts",
+    "seed:usuarios": "ts-node src/config/seedUsuarios.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },
@@ -23,7 +24,6 @@
   "author": "Victor Rodríguez",
   "license": "ISC",
   "dependencies": {
-    "@supabase/supabase-js": "^2.101.1",
     "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",

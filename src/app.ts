@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 
 import pacienteRoutes from "./routes/paciente.routes";
+import pacienteMeRoutes from "./routes/paciente.me.routes";
 import especialidadRoutes from "./routes/especialidad.routes";
 import doctorRoutes from "./routes/doctor.routes";
 import medicoRoutes from "./routes/medico.routes"; // ✅ CORRECTO
@@ -19,9 +20,22 @@ import { errorHandler } from "./middlewares/errorHandler";
 
 const app = express();
 
+// Siempre incluir puertos de desarrollo de Vite + cualquier extra de FRONTEND_URL
+const DEV_ORIGINS = ["http://localhost:5173", "http://localhost:5174"];
+const extraOrigins = (process.env.FRONTEND_URL ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+const allowedOrigins = Array.from(new Set([...DEV_ORIGINS, ...extraOrigins]));
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: (origin, callback) => {
+      // Permite requests sin origin (Postman, curl, server-to-server)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error(`Origen no permitido por CORS: ${origin}`));
+    },
     credentials: true,
   })
 );
@@ -49,6 +63,7 @@ app.get("/", (_req, res) => {
 });
 
 // ✅ ORDEN CORRECTO: medico ANTES de doctores
+app.use("/api/paciente", pacienteMeRoutes); // portal del paciente (singular)
 app.use("/api/pacientes", pacienteRoutes);
 app.use("/api/especialidades", especialidadRoutes);
 app.use("/api/medico", medicoRoutes); 

@@ -1,7 +1,10 @@
 import { Request, Response } from "express";
+import bcrypt from "bcryptjs";
 import { Paciente } from "../models/Paciente";
 import { Cita } from "../models/Cita";
 import { OrdenExamen } from "../models/OrdenExamen";
+import { Usuario } from "../models/Usuario";
+import { generarPasswordTemporal } from "../utils/generarPasswordTemporal";
 
 // ─── Validaciones ─────────────────────────────────────────
 const soloLetras    = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/;
@@ -24,14 +27,33 @@ const validarPaciente = (body: any, esActualizacion = false): string | null => {
   return null;
 };
 
-// Crear paciente
+// Crear paciente — opcionalmente crea también cuenta de portal
+// Body extra: { crearCuentaPortal?: boolean, passwordPortal?: string }
 export const crearPaciente = async (req: Request, res: Response) => {
   try {
     const error = validarPaciente(req.body);
     if (error) return res.status(400).json({ success: false, message: error });
 
+    const { telefono, correo, crearCuentaPortal, passwordPortal } = req.body;
+
+    // Validaciones específicas si se va a crear cuenta de portal
+    if (crearCuentaPortal) {
+      if (!correo?.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "El correo es obligatorio para crear cuenta de portal",
+        });
+      }
+      const existeUsuario = await Usuario.findOne({ correo: correo.trim().toLowerCase() });
+      if (existeUsuario) {
+        return res.status(400).json({
+          success: false,
+          message: "Ya existe una cuenta de usuario con ese correo",
+        });
+      }
+    }
+
     // Verificar duplicados de teléfono y correo
-    const { telefono, correo } = req.body;
     if (telefono?.trim()) {
       const existe = await Paciente.findOne({ telefono: telefono.trim() });
       if (existe) return res.status(400).json({ success: false, message: "Ya existe un paciente con ese teléfono" });
@@ -42,17 +64,110 @@ export const crearPaciente = async (req: Request, res: Response) => {
     }
 
     const paciente = await Paciente.create(req.body);
-    res.status(201).json({ success: true, message: "Paciente creado correctamente", data: paciente });
+
+    // Crear cuenta de portal si fue solicitada
+    let credenciales: { correo: string; passwordTemporal: string } | undefined;
+    if (crearCuentaPortal) {
+      const passwordPlano = passwordPortal?.trim() || generarPasswordTemporal();
+      const passwordHash  = await bcrypt.hash(passwordPlano, 10);
+      await Usuario.create({
+        nombres:    paciente.nombres,
+        apellidos:  paciente.apellidos,
+        correo:     paciente.correo!.toLowerCase(),
+        passwordHash,
+        rol:        "PACIENTE",
+        pacienteId: paciente._id,
+      });
+      credenciales = {
+        correo:           paciente.correo!.toLowerCase(),
+        passwordTemporal: passwordPlano,
+      };
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "Paciente creado correctamente",
+      data: paciente,
+      credenciales, // solo presente si se creó cuenta
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// Listar todos los pacientes
+// Crear cuenta de portal para un paciente existente.
+// Útil para los pacientes ya registrados que aún no tienen cuenta.
+export const crearCuentaPaciente = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { passwordPortal } = req.body;
+
+    const paciente = await Paciente.findById(id);
+    if (!paciente) {
+      return res.status(404).json({ success: false, message: "Paciente no encontrado" });
+    }
+    if (!paciente.correo?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "El paciente no tiene correo registrado. Actualízalo antes de crear cuenta.",
+      });
+    }
+
+    const yaTieneCuenta = await Usuario.findOne({
+      $or: [
+        { pacienteId: paciente._id },
+        { correo: paciente.correo.toLowerCase() },
+      ],
+    });
+    if (yaTieneCuenta) {
+      return res.status(400).json({
+        success: false,
+        message: "Este paciente ya tiene cuenta registrada",
+      });
+    }
+
+    const passwordPlano = passwordPortal?.trim() || generarPasswordTemporal();
+    const passwordHash  = await bcrypt.hash(passwordPlano, 10);
+
+    await Usuario.create({
+      nombres:    paciente.nombres,
+      apellidos:  paciente.apellidos,
+      correo:     paciente.correo.toLowerCase(),
+      passwordHash,
+      rol:        "PACIENTE",
+      pacienteId: paciente._id,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Cuenta de portal creada correctamente",
+      credenciales: {
+        correo:           paciente.correo.toLowerCase(),
+        passwordTemporal: passwordPlano,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Listar todos los pacientes — incluye flag `tieneCuentaPortal` por paciente
 export const listarPacientes = async (_req: Request, res: Response) => {
   try {
-    const pacientes = await Paciente.find();
-    res.json({ success: true, data: pacientes });
+    const pacientes = await Paciente.find().lean({ virtuals: true });
+
+    // Buscar todos los Usuario PACIENTE en una sola query y armar set de IDs
+    const cuentas = await Usuario.find({ rol: "PACIENTE" }).select("pacienteId").lean();
+    const idsConCuenta = new Set(
+      cuentas.map((u) => u.pacienteId?.toString()).filter(Boolean)
+    );
+
+    const data = pacientes.map((p: any) => ({
+      ...p,
+      tieneCuentaPortal: idsConCuenta.has(String(p._id)),
+    }));
+
+    res.json({ success: true, data });
   } catch (error: any) {
     console.error("Error al listar pacientes:", error);
     res.status(500).json({ success: false, message: error.message });
