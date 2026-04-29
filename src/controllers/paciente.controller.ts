@@ -170,6 +170,26 @@ export const obtenerHistorial = async (req: Request, res: Response) => {
   }
 };
 
+// Actualizar historial clínico (alergias, medicamentos habituales, problemas médicos)
+export const actualizarHistorialClinico = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { alergias, medicamentosHabituales, problemasMedicos } = req.body;
+
+    const update: Record<string, any> = {};
+    if (alergias !== undefined) update.alergias = alergias;
+    if (medicamentosHabituales !== undefined) update.medicamentosHabituales = medicamentosHabituales;
+    if (problemasMedicos !== undefined) update.problemasMedicos = problemasMedicos;
+
+    const paciente = await Paciente.findByIdAndUpdate(id, update, { new: true, runValidators: true });
+    if (!paciente) return res.status(404).json({ success: false, message: "Paciente no encontrado" });
+
+    res.json({ success: true, message: "Historial clínico actualizado", data: paciente });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export const eliminarPaciente = async (req: Request, res: Response) => {
   try {
     const paciente = await Paciente.findByIdAndDelete(req.params.id);
