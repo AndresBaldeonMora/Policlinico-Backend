@@ -148,7 +148,7 @@ export const obtenerDetalleCita = async (req: Request, res: Response) => {
   try {
     const cita = await Cita.findById(req.params.id).populate(
       "pacienteId",
-      "nombres apellidos dni telefono correo direccion fechaNacimiento"
+      "nombres apellidos dni telefono correo direccion fechaNacimiento alergias medicamentosHabituales problemasMedicos"
     );
 
     if (!cita) {

@@ -1,5 +1,24 @@
 import mongoose, { Schema, Document } from "mongoose";
 
+export interface IAlergia {
+  sustancia: string;
+  reaccion: string;
+  severidad: "leve" | "moderada" | "severa";
+}
+
+export interface IMedicamentoHabitual {
+  nombre: string;
+  dosis: string;
+  frecuencia: string;
+  activo: boolean;
+}
+
+export interface IProblemaMedico {
+  descripcion: string;
+  estado: "activo" | "resuelto";
+  fechaInicio?: Date;
+}
+
 export interface IPaciente extends Document {
   nombres: string;
   apellidos: string;
@@ -14,6 +33,9 @@ export interface IPaciente extends Document {
   apoderadoNombre?: string;
   apoderadoParentesco?: string;
   apoderadoTelefono?: string;
+  alergias: IAlergia[];
+  medicamentosHabituales: IMedicamentoHabitual[];
+  problemasMedicos: IProblemaMedico[];
   edad?: number; // virtual
 }
 
@@ -37,6 +59,22 @@ const pacienteSchema = new Schema<IPaciente>(
     apoderadoNombre:      { type: String, trim: true, default: "" },
     apoderadoParentesco:  { type: String, trim: true, default: "" },
     apoderadoTelefono:    { type: String, trim: true, default: "" },
+    alergias: [{
+      sustancia: { type: String, trim: true, required: true },
+      reaccion:  { type: String, trim: true, default: "" },
+      severidad: { type: String, enum: ["leve", "moderada", "severa"], default: "leve" },
+    }],
+    medicamentosHabituales: [{
+      nombre:    { type: String, trim: true, required: true },
+      dosis:     { type: String, trim: true, default: "" },
+      frecuencia:{ type: String, trim: true, default: "" },
+      activo:    { type: Boolean, default: true },
+    }],
+    problemasMedicos: [{
+      descripcion: { type: String, trim: true, required: true },
+      estado:      { type: String, enum: ["activo", "resuelto"], default: "activo" },
+      fechaInicio: { type: Date },
+    }],
   },
   {
     timestamps: true,

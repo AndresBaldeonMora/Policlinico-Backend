@@ -192,7 +192,7 @@ export const obtenerCitasCalendario = async (req: Request, res: Response) => {
 export const obtenerCitaPorId = async (req: Request, res: Response) => {
   try {
     const cita = await Cita.findById(req.params.id)
-      .populate("pacienteId", "nombres apellidos dni telefono")
+      .populate("pacienteId", "nombres apellidos dni telefono correo fechaNacimiento alergias medicamentosHabituales problemasMedicos")
       .populate({
         path: "doctorId",
         select: "nombres apellidos especialidadId",
