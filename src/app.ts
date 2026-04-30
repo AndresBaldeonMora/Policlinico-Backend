@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 
 import pacienteRoutes from "./routes/paciente.routes";
+import pacienteMeRoutes from "./routes/paciente.me.routes";
 import especialidadRoutes from "./routes/especialidad.routes";
 import doctorRoutes from "./routes/doctor.routes";
 import medicoRoutes from "./routes/medico.routes"; // ✅ CORRECTO
@@ -63,6 +64,7 @@ app.get("/", (_req, res) => {
 });
 
 // ✅ ORDEN CORRECTO: medico ANTES de doctores
+app.use("/api/paciente", pacienteMeRoutes); // portal del paciente (singular)
 app.use("/api/pacientes", pacienteRoutes);
 app.use("/api/especialidades", especialidadRoutes);
 app.use("/api/medico", medicoRoutes); 
