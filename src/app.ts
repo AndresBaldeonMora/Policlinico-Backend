@@ -20,23 +20,24 @@ import { errorHandler } from "./middlewares/errorHandler";
 
 const app = express();
 
-// Siempre incluir puertos de desarrollo de Vite + cualquier extra de FRONTEND_URL
-const DEV_ORIGINS = ["http://localhost:5173", "http://localhost:5174"];
-const extraOrigins = (process.env.FRONTEND_URL ?? "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
-const allowedOrigins = Array.from(new Set([...DEV_ORIGINS, ...extraOrigins]));
+const allowedOrigins = [
+  process.env.FRONTEND_URL || "http://localhost:5173",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+];
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Permite requests sin origin (Postman, curl, server-to-server)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error(`Origen no permitido por CORS: ${origin}`));
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
     },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
