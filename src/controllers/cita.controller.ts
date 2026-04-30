@@ -45,9 +45,14 @@ export const crearCita = async (req: Request, res: Response) => {
       });
     }
 
-    const citaExistente = await Cita.findOne({ doctorId, fecha: fechaUTC, hora });
-    if (citaExistente) {
-      return res.status(400).json({ success: false, message: "Ya existe una cita para ese horario" });
+    const citaExistenteDoctor = await Cita.findOne({ doctorId, fecha: fechaUTC, hora, estado: { $nin: ["CANCELADA", "VENCIDA"] } });
+    if (citaExistenteDoctor) {
+      return res.status(400).json({ success: false, message: "Ya existe una cita para ese horario con este doctor" });
+    }
+
+    const citaExistentePaciente = await Cita.findOne({ pacienteId, fecha: fechaUTC, hora, estado: { $nin: ["CANCELADA", "VENCIDA"] } });
+    if (citaExistentePaciente) {
+       return res.status(400).json({ success: false, message: "El paciente ya tiene otra cita médica reservada para esta misma fecha y hora" });
     }
 
     const nuevaCita = new Cita({ pacienteId, doctorId, fecha: fechaUTC, hora, estado: "PENDIENTE" });
