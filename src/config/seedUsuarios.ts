@@ -1,10 +1,9 @@
 /**
- * Seed de usuarios del sistema (post-migración de Supabase a JWT propio).
+ * Seed de usuarios del sistema.
  *
- * - Idempotente: si el correo ya existe en `usuarios`, lo salta.
- * - Para rol MEDICO: busca un Doctor con el mismo correo y lo vincula vía `medicoId`.
- * - Para rol PACIENTE: busca un Paciente con el mismo correo y lo vincula vía `pacienteId`.
- * - Las contraseñas son temporales — los usuarios deberían cambiarlas al primer login.
+ * - Limpia todos los usuarios existentes antes de crear los nuevos.
+ * - Crea cuentas fijas: paciente, administrador, recepcionista.
+ * - Crea una cuenta por cada especialidad médica vinculada al Doctor de esa especialidad.
  *
  * Ejecución: npm run seed:usuarios
  */
@@ -17,8 +16,11 @@ import bcrypt from "bcryptjs";
 import { Usuario, RolUsuario } from "../models/Usuario";
 import { Doctor } from "../models/Doctor";
 import { Paciente } from "../models/Paciente";
+import { Especialidad } from "../models/Especialidad";
 
-interface UsuarioSeed {
+// ─── Cuentas fijas ────────────────────────────────────────────────────────────
+
+interface CuentaFija {
   nombres: string;
   apellidos: string;
   correo: string;
@@ -26,22 +28,64 @@ interface UsuarioSeed {
   rol: RolUsuario;
 }
 
-const USUARIOS: UsuarioSeed[] = [
+const CUENTAS_FIJAS: CuentaFija[] = [
   {
-    nombres:   "Andres",
-    apellidos: "Recepcion",
-    correo:    "andres@sanjose.com",
-    password:  "andres",
+    nombres:   "Paciente",
+    apellidos: "Demo",
+    correo:    "paciente@sanjose.com",
+    password:  "paciente",
+    rol:       "PACIENTE",
+  },
+  {
+    nombres:   "Administrador",
+    apellidos: "Principal",
+    correo:    "administrador@sanjose.com",
+    password:  "administrador",
+    rol:       "ADMINISTRADOR",
+  },
+  {
+    nombres:   "Recepcionista",
+    apellidos: "Principal",
+    correo:    "recepcionista@sanjose.com",
+    password:  "recepcionista",
     rol:       "RECEPCIONISTA",
   },
-  {
-    nombres:   "Jasmen",
-    apellidos: "Medico",
-    correo:    "jasmen@sanjose.com",
-    password:  "jasmen",
-    rol:       "MEDICO",
-  },
 ];
+
+// ─── Cuentas médicas por especialidad ─────────────────────────────────────────
+// correoPrefix → email será {prefix}@sanjose.com
+// password     → contraseña corta de la especialidad
+
+interface CuentaMedica {
+  especialidad: string; // nombre exacto en DB
+  prefix: string;       // parte antes del @
+  password: string;
+}
+
+const CUENTAS_MEDICAS: CuentaMedica[] = [
+  { especialidad: "Pediatría",                        prefix: "pediatria",          password: "pediatria"          },
+  { especialidad: "Medicina Interna",                 prefix: "medicinainterna",     password: "medicinainterna"    },
+  { especialidad: "Ginecología",                      prefix: "ginecologia",         password: "ginecologia"        },
+  { especialidad: "Cardiología",                      prefix: "cardiologia",         password: "cardiologia"        },
+  { especialidad: "Oftalmología",                     prefix: "oftalmologia",        password: "oftalmologia"       },
+  { especialidad: "Medicina Física y Rehabilitación", prefix: "medicinafisica",      password: "medicinafisica"     },
+  { especialidad: "Neumología",                       prefix: "neumologia",          password: "neumologia"         },
+  { especialidad: "Reumatología",                     prefix: "reumatologia",        password: "reumatologia"       },
+  { especialidad: "Radiología",                       prefix: "radiologia",          password: "radiologia"         },
+  { especialidad: "Gastroenterología",                prefix: "gastroenterologia",   password: "gastroenterologia"  },
+  { especialidad: "Odontología",                      prefix: "odontologia",         password: "odontologia"        },
+  { especialidad: "Endocrinología",                   prefix: "endocrinologia",      password: "endocrinologia"     },
+  { especialidad: "Traumatología",                    prefix: "traumatologia",       password: "traumatologia"      },
+  { especialidad: "Geriatría",                        prefix: "geriatria",           password: "geriatria"          },
+  { especialidad: "Medicina",                         prefix: "medicina",            password: "medicina"           },
+  { especialidad: "Medicina Familiar",                prefix: "medicinafamiliar",    password: "medicinafamiliar"   },
+  { especialidad: "Ecografías",                       prefix: "ecografias",          password: "ecografias"         },
+  { especialidad: "Otorrinolaringología",             prefix: "otorrino",            password: "otorrino"           },
+  { especialidad: "Urología",                         prefix: "urologia",            password: "urologia"           },
+  { especialidad: "Cosmiatría",                       prefix: "cosmiatra",           password: "cosmiatra"          },
+];
+
+// ─── Main ──────────────────────────────────────────────────────────────────────
 
 async function seedUsuarios() {
   const uri = process.env.MONGODB_URI;
@@ -53,55 +97,39 @@ async function seedUsuarios() {
   await mongoose.connect(uri);
   console.log("✅ Conectado a MongoDB\n");
 
-  let creados = 0, saltados = 0, errores = 0;
+  // Limpiar todos los usuarios
+  const deleted = await Usuario.deleteMany({});
+  console.log(`🗑️  ${deleted.deletedCount} usuarios eliminados\n`);
 
-  for (const u of USUARIOS) {
-    const correo = u.correo.toLowerCase().trim();
+  let creados = 0, errores = 0;
+
+  // ── 1. Cuentas fijas ────────────────────────────────────────────────────────
+  console.log("── Cuentas fijas ──────────────────────────────────────────");
+  for (const c of CUENTAS_FIJAS) {
+    const correo = c.correo.toLowerCase().trim();
     try {
-      const yaExiste = await Usuario.findOne({ correo });
-      if (yaExiste) {
-        console.log(`⏭️  ${correo} — ya existe, saltado`);
-        saltados++;
-        continue;
-      }
-
-      // Vincular con Doctor o Paciente si corresponde
-      let medicoId: mongoose.Types.ObjectId | undefined;
       let pacienteId: mongoose.Types.ObjectId | undefined;
 
-      if (u.rol === "MEDICO") {
-        const doctor = await Doctor.findOne({ correo });
-        if (doctor) {
-          medicoId = doctor._id;
-          console.log(`🔗 ${correo} — vinculado al Doctor ${doctor.nombres} ${doctor.apellidos}`);
-        } else {
-          console.log(`⚠️  ${correo} — rol MEDICO pero no se encontró Doctor con ese correo (se crea sin vínculo)`);
-        }
-      }
-
-      if (u.rol === "PACIENTE") {
+      if (c.rol === "PACIENTE") {
         const paciente = await Paciente.findOne({ correo });
         if (paciente) {
           pacienteId = paciente._id as mongoose.Types.ObjectId;
           console.log(`🔗 ${correo} — vinculado al Paciente ${paciente.nombres} ${paciente.apellidos}`);
         } else {
-          console.log(`⚠️  ${correo} — rol PACIENTE pero no se encontró Paciente con ese correo (se crea sin vínculo)`);
+          console.log(`⚠️  ${correo} — no se encontró Paciente con ese correo (se crea sin vínculo)`);
         }
       }
 
-      const passwordHash = await bcrypt.hash(u.password, 10);
-
+      const passwordHash = await bcrypt.hash(c.password, 10);
       await Usuario.create({
-        nombres:   u.nombres,
-        apellidos: u.apellidos,
+        nombres:    c.nombres,
+        apellidos:  c.apellidos,
         correo,
         passwordHash,
-        rol:       u.rol,
-        medicoId,
+        rol:        c.rol,
         pacienteId,
       });
-
-      console.log(`✅ ${correo} — creado (${u.rol})`);
+      console.log(`✅ ${correo} — creado (${c.rol})`);
       creados++;
     } catch (err: any) {
       console.error(`❌ ${correo} — error: ${err.message}`);
@@ -109,12 +137,49 @@ async function seedUsuarios() {
     }
   }
 
-  console.log("\n────────────────────────────────");
-  console.log(`Total: ${USUARIOS.length}`);
-  console.log(`✅ Creados: ${creados}`);
-  console.log(`⏭️  Saltados: ${saltados}`);
-  console.log(`❌ Errores: ${errores}`);
-  console.log("────────────────────────────────\n");
+  // ── 2. Cuentas médicas ──────────────────────────────────────────────────────
+  console.log("\n── Cuentas médicas ────────────────────────────────────────");
+  for (const m of CUENTAS_MEDICAS) {
+    const correo = `${m.prefix}@sanjose.com`;
+    try {
+      const especialidad = await Especialidad.findOne({ nombre: m.especialidad });
+      if (!especialidad) {
+        console.log(`⚠️  ${correo} — especialidad "${m.especialidad}" no encontrada en DB (saltado)`);
+        errores++;
+        continue;
+      }
+
+      const doctor = await Doctor.findOne({ especialidadId: especialidad._id });
+      if (!doctor) {
+        console.log(`⚠️  ${correo} — no hay Doctor para especialidad "${m.especialidad}" (saltado)`);
+        errores++;
+        continue;
+      }
+
+      const passwordHash = await bcrypt.hash(m.password, 10);
+      await Usuario.create({
+        nombres:    doctor.nombres,
+        apellidos:  doctor.apellidos,
+        correo,
+        passwordHash,
+        rol:        "MEDICO" as RolUsuario,
+        medicoId:   doctor._id,
+      });
+      console.log(`✅ ${correo} — creado → Dr. ${doctor.nombres} ${doctor.apellidos} (${m.especialidad})`);
+      creados++;
+    } catch (err: any) {
+      console.error(`❌ ${correo} — error: ${err.message}`);
+      errores++;
+    }
+  }
+
+  // ── Resumen ─────────────────────────────────────────────────────────────────
+  const total = CUENTAS_FIJAS.length + CUENTAS_MEDICAS.length;
+  console.log("\n────────────────────────────────────────────────────────────");
+  console.log(`Total esperado : ${total}`);
+  console.log(`✅ Creados     : ${creados}`);
+  console.log(`❌ Errores     : ${errores}`);
+  console.log("────────────────────────────────────────────────────────────\n");
 
   await mongoose.disconnect();
   process.exit(0);
