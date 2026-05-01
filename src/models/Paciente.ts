@@ -33,6 +33,7 @@ export interface IPaciente extends Document {
   apoderadoNombre?: string;
   apoderadoParentesco?: string;
   apoderadoTelefono?: string;
+  avatar?: string;
   alergias: IAlergia[];
   medicamentosHabituales: IMedicamentoHabitual[];
   problemasMedicos: IProblemaMedico[];
@@ -59,6 +60,7 @@ const pacienteSchema = new Schema<IPaciente>(
     apoderadoNombre:      { type: String, trim: true, default: "" },
     apoderadoParentesco:  { type: String, trim: true, default: "" },
     apoderadoTelefono:    { type: String, trim: true, default: "" },
+    avatar:               { type: String, default: null },
     alergias: [{
       sustancia: { type: String, trim: true, required: true },
       reaccion:  { type: String, trim: true, default: "" },
