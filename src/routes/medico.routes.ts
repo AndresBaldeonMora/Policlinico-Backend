@@ -7,6 +7,7 @@ import {
   obtenerDetalleCita,
   guardarNotasClinicas,
   prescribirMedicamentos,
+  obtenerHistorialCitasPaciente,
 } from "../controllers/medico.controller";
 import { verifyToken, requireRole } from "../middlewares/authMiddlewares";
 
@@ -26,5 +27,8 @@ router.get("/citas/:id", obtenerDetalleCita);
 router.patch("/citas/:id/estado", actualizarEstadoCita);
 router.patch("/citas/:id/notas", guardarNotasClinicas);
 router.patch("/citas/:id/medicamentos", prescribirMedicamentos);
+
+// Historial de citas de un paciente (acceso completo, todas las especialidades)
+router.get("/pacientes/:pacienteId/historial-citas", obtenerHistorialCitasPaciente);
 
 export default router;

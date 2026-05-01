@@ -121,10 +121,6 @@ export const guardarNotasClinicas = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { notasClinicas, diagnostico, tratamiento } = req.body;
 
-    if (!diagnostico || diagnostico.trim().length === 0) {
-      return res.status(400).json({ success: false, message: "El diagnóstico es obligatorio" });
-    }
-
     const cita = await Cita.findByIdAndUpdate(
       id,
       { notasClinicas, diagnostico, tratamiento },
@@ -143,7 +139,7 @@ export const obtenerDetalleCita = async (req: Request, res: Response) => {
   try {
     const cita = await Cita.findById(req.params.id).populate(
       "pacienteId",
-      "nombres apellidos dni telefono correo direccion fechaNacimiento alergias medicamentosHabituales problemasMedicos"
+      "nombres apellidos dni telefono correo direccion fechaNacimiento alergias medicamentosHabituales problemasMedicos cirugiasPrevias antecedentesFamiliares"
     );
 
     if (!cita) {
@@ -151,6 +147,29 @@ export const obtenerDetalleCita = async (req: Request, res: Response) => {
     }
 
     res.json({ success: true, data: cita });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const obtenerHistorialCitasPaciente = async (req: Request, res: Response) => {
+  try {
+    const { pacienteId } = req.params;
+    const { excluirCitaId } = req.query;
+
+    const query: any = { pacienteId };
+    if (excluirCitaId) query._id = { $ne: excluirCitaId };
+
+    const citas = await Cita.find(query)
+      .populate({
+        path: "doctorId",
+        select: "nombres apellidos especialidadId",
+        populate: { path: "especialidadId", select: "nombre" },
+      })
+      .sort({ fecha: -1, hora: -1 })
+      .limit(50);
+
+    res.json({ success: true, data: citas });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
