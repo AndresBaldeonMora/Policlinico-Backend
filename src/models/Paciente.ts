@@ -19,6 +19,17 @@ export interface IProblemaMedico {
   fechaInicio?: Date;
 }
 
+export interface ICirugiaPevia {
+  procedimiento: string;
+  fecha?: Date;
+  hospital?: string;
+}
+
+export interface IAntecedenteFamiliar {
+  parentesco: string;
+  condicion: string;
+}
+
 export interface IPaciente extends Document {
   nombres: string;
   apellidos: string;
@@ -36,6 +47,8 @@ export interface IPaciente extends Document {
   alergias: IAlergia[];
   medicamentosHabituales: IMedicamentoHabitual[];
   problemasMedicos: IProblemaMedico[];
+  cirugiasPrevias: ICirugiaPevia[];
+  antecedentesFamiliares: IAntecedenteFamiliar[];
   edad?: number; // virtual
 }
 
@@ -74,6 +87,15 @@ const pacienteSchema = new Schema<IPaciente>(
       descripcion: { type: String, trim: true, required: true },
       estado:      { type: String, enum: ["activo", "resuelto"], default: "activo" },
       fechaInicio: { type: Date },
+    }],
+    cirugiasPrevias: [{
+      procedimiento: { type: String, trim: true, required: true },
+      fecha:         { type: Date },
+      hospital:      { type: String, trim: true, default: "" },
+    }],
+    antecedentesFamiliares: [{
+      parentesco: { type: String, trim: true, required: true },
+      condicion:  { type: String, trim: true, required: true },
     }],
   },
   {
