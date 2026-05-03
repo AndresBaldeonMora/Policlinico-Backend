@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import path from "path";
 
 import pacienteRoutes from "./routes/paciente.routes";
 import pacienteMeRoutes from "./routes/paciente.me.routes";
@@ -43,6 +44,9 @@ app.use(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Servir archivos estáticos subidos (avatares, etc.) desde /uploads
+app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 
 app.get("/", (_req, res) => {
   res.json({
