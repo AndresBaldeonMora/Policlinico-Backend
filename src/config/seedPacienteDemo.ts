@@ -25,6 +25,7 @@ import { Doctor }       from "../models/Doctor";
 import { Especialidad } from "../models/Especialidad";
 import { Cita }         from "../models/Cita";
 import { OrdenExamen }  from "../models/OrdenExamen";
+import { ExamenLaboratorioImagen } from "../models/ExamenLaboratorioImagen";
 
 const CORREO_PACIENTE  = "paciente@sanjose.com";
 const PASSWORD_DEMO    = "paciente";
@@ -272,6 +273,26 @@ async function seedPacienteDemo() {
   const espMedicinaInterna = await Especialidad.findOne({ nombre: "Medicina Interna" });
   const espCardiologia     = await Especialidad.findOne({ nombre: "Cardiología" });
 
+  // Buscar exámenes reales del catálogo
+  const exGlucosa    = await ExamenLaboratorioImagen.findOne({ nombre: /Perfil Glucémico/i });
+  const exLipidos    = await ExamenLaboratorioImagen.findOne({ nombre: /Perfil Lipídico/i });
+  const exRenal      = await ExamenLaboratorioImagen.findOne({ nombre: /Perfil Renal/i });
+  const exHemograma  = await ExamenLaboratorioImagen.findOne({ nombre: /Hemograma/i });
+  const exInsulina   = await ExamenLaboratorioImagen.findOne({ nombre: /Insulina/i });
+  const exECG        = await ExamenLaboratorioImagen.findOne({ nombre: /Electrocardiograma/i });
+  const exHolter     = await ExamenLaboratorioImagen.findOne({ nombre: /Holter/i });
+
+  const mkItem = (examen: any, seccion: "LAB" | "IMAGEN", obs = "", completado = false, valor = "", unidad = "") => ({
+    examenId:              examen._id,
+    seccion,
+    observaciones:         obs,
+    respuestasProtocolares: [],
+    estadoItem:            completado ? "COMPLETADO" : "PENDIENTE",
+    ...(valor   ? { valorResultado:  valor }  : {}),
+    ...(unidad  ? { unidadResultado: unidad } : {}),
+    ...(completado ? { fechaResultado: daysAgo(17) } : {}),
+  });
+
   const ordenesACrear: any[] = [];
 
   // ── Orden FINALIZADA con resultados ───────────────────────────────────────
@@ -287,38 +308,12 @@ async function seedPacienteDemo() {
       fechaAsistencia:   daysAgo(18),
       fechaResultados:   daysAgo(17),
       estado:         "FINALIZADO",
-      observacionesGenerales: "Perfil metabólico completo solicitado por control de DM2.",
+      observacionesGenerales: "Perfil metabólico completo por control de DM2.",
+      notas: "Continuar con dieta baja en carbohidratos refinados. Próximo control en 3 meses.",
       items: [
-        {
-          examenId:       new mongoose.Types.ObjectId(),
-          seccion:        "LAB",
-          observaciones:  "Ayuno de 8 horas previo",
-          respuestasProtocolares: [],
-          valorResultado: "145",
-          unidadResultado:"mg/dL",
-          fechaResultado: daysAgo(17),
-          estadoItem:     "COMPLETADO",
-        },
-        {
-          examenId:       new mongoose.Types.ObjectId(),
-          seccion:        "LAB",
-          observaciones:  "",
-          respuestasProtocolares: [],
-          valorResultado: "7.8",
-          unidadResultado:"%",
-          fechaResultado: daysAgo(17),
-          estadoItem:     "COMPLETADO",
-        },
-        {
-          examenId:       new mongoose.Types.ObjectId(),
-          seccion:        "LAB",
-          observaciones:  "",
-          respuestasProtocolares: [],
-          valorResultado: "210",
-          unidadResultado:"mg/dL",
-          fechaResultado: daysAgo(17),
-          estadoItem:     "COMPLETADO",
-        },
+        ...(exGlucosa  ? [mkItem(exGlucosa,  "LAB", "Ayuno de 8 horas", true, "145", "mg/dL")] : []),
+        ...(exInsulina ? [mkItem(exInsulina, "LAB", "",                  true, "7.8", "%")]    : []),
+        ...(exLipidos  ? [mkItem(exLipidos,  "LAB", "",                  true, "210", "mg/dL")] : []),
       ],
     });
   }
@@ -337,25 +332,10 @@ async function seedPacienteDemo() {
       fechaResultados:   daysAgo(42),
       estado:         "FINALIZADO",
       observacionesGenerales: "Hemograma completo + perfil lipídico.",
+      notas: "Se recomienda actividad física moderada y dieta baja en grasas saturadas.",
       items: [
-        {
-          examenId:       new mongoose.Types.ObjectId(),
-          seccion:        "LAB",
-          respuestasProtocolares: [],
-          valorResultado: "13.5",
-          unidadResultado:"g/dL",
-          fechaResultado: daysAgo(42),
-          estadoItem:     "COMPLETADO",
-        },
-        {
-          examenId:       new mongoose.Types.ObjectId(),
-          seccion:        "LAB",
-          respuestasProtocolares: [],
-          valorResultado: "185",
-          unidadResultado:"mg/dL",
-          fechaResultado: daysAgo(42),
-          estadoItem:     "COMPLETADO",
-        },
+        ...(exHemograma ? [{ ...mkItem(exHemograma, "LAB", "", true, "13.5", "g/dL"), fechaResultado: daysAgo(42) }] : []),
+        ...(exLipidos   ? [{ ...mkItem(exLipidos,   "LAB", "", true, "185",  "mg/dL"), fechaResultado: daysAgo(42) }] : []),
       ],
     });
   }
@@ -370,17 +350,13 @@ async function seedPacienteDemo() {
       tipoOrden:      "IMAGEN",
       fecha:          daysAgo(5),
       fechaAutorizacion: daysAgo(4),
-      fechaCitaLab:   daysFrom(3),
+      citaImagenFecha: (() => { const d = daysFrom(3); d.setUTCHours(9, 30, 0, 0); return d; })(),
       estado:         "EN_PROCESO",
-      observacionesGenerales: "Ecocardiograma transtorácico para evaluación de función ventricular.",
+      observacionesGenerales: "Evaluación de función ventricular y descartar patología estructural.",
+      notas: "Presentarse con ropa cómoda. Evitar cremas o lociones en el área del pecho el día del estudio.",
       items: [
-        {
-          examenId:       new mongoose.Types.ObjectId(),
-          seccion:        "IMAGEN",
-          observaciones:  "Paciente debe estar en reposo 15 min antes del estudio.",
-          respuestasProtocolares: [],
-          estadoItem:     "PENDIENTE",
-        },
+        ...(exECG    ? [mkItem(exECG,    "IMAGEN", "Paciente en reposo 15 min previos")]  : []),
+        ...(exHolter ? [mkItem(exHolter, "IMAGEN", "No retirar los electrodos durante 24h")] : []),
       ],
     });
   }
@@ -397,21 +373,12 @@ async function seedPacienteDemo() {
       fechaAutorizacion: daysAgo(1),
       fechaCitaLab:   daysFrom(3),
       estado:         "PENDIENTE",
-      observacionesGenerales: "Control trimestral: glucosa, HbA1c, función renal.",
+      observacionesGenerales: "Control trimestral de DM2 e HTA.",
+      notas: "Recordar ayuno de 8 horas antes de la toma de muestra. Traer resultados anteriores.",
       items: [
-        {
-          examenId:       new mongoose.Types.ObjectId(),
-          seccion:        "LAB",
-          observaciones:  "Ayuno de 8 horas",
-          respuestasProtocolares: [],
-          estadoItem:     "PENDIENTE",
-        },
-        {
-          examenId:       new mongoose.Types.ObjectId(),
-          seccion:        "LAB",
-          respuestasProtocolares: [],
-          estadoItem:     "PENDIENTE",
-        },
+        ...(exGlucosa ? [mkItem(exGlucosa, "LAB", "Ayuno de 8 horas")] : []),
+        ...(exRenal   ? [mkItem(exRenal,   "LAB", "")]                  : []),
+        ...(exInsulina? [mkItem(exInsulina,"LAB", "")]                  : []),
       ],
     });
   }
