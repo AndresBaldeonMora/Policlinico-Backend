@@ -12,6 +12,7 @@ import {
   marcarAsistencia,
   obtenerHistorialCitas,
   obtenerDetalleCitaHistorial,
+  eliminarCita,
 } from "../controllers/cita.controller";
 
 
@@ -28,6 +29,7 @@ router.put("/:id/reprogramar", reprogramarCita);
 router.put("/:id/cancelar", cancelarCita);
 router.patch("/:id/estado", cambiarEstado); 
 router.patch("/:id/marcar-asistencia", marcarAsistencia);
+router.delete("/:id", eliminarCita);
 
 
 export default router;

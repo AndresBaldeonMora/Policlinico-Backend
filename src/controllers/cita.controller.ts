@@ -414,6 +414,16 @@ export const obtenerHistorialCitas = async (req: Request, res: Response) => {
   }
 };
 
+export const eliminarCita = async (req: Request, res: Response) => {
+  try {
+    const cita = await Cita.findByIdAndDelete(req.params.id);
+    if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
+    res.json({ success: true, message: "Cita eliminada correctamente" });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: "Error al eliminar la cita", error: error.message });
+  }
+};
+
 export const obtenerDetalleCitaHistorial = async (req: Request, res: Response) => {
   try {
     const cita = await Cita.findById(req.params.id)
