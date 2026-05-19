@@ -273,13 +273,14 @@ async function seedPacienteDemo() {
   const espMedicinaInterna = await Especialidad.findOne({ nombre: "Medicina Interna" });
   const espCardiologia     = await Especialidad.findOne({ nombre: "Cardiología" });
 
-  // Buscar exámenes reales del catálogo
-  const exGlucosa    = await ExamenLaboratorioImagen.findOne({ nombre: /Perfil Glucémico/i });
-  const exLipidos    = await ExamenLaboratorioImagen.findOne({ nombre: /Perfil Lipídico/i });
-  const exRenal      = await ExamenLaboratorioImagen.findOne({ nombre: /Perfil Renal/i });
+  // Buscar exámenes del catálogo con patrones amplios para compatibilidad
+  // con seedCompleto (nombres cortos) y seedExamenes (nombres detallados).
+  const exGlucosa    = await ExamenLaboratorioImagen.findOne({ nombre: /Glucos|Glucém/i });
+  const exLipidos    = await ExamenLaboratorioImagen.findOne({ nombre: /Lipídico|Lip[ií]dico/i });
+  const exRenal      = await ExamenLaboratorioImagen.findOne({ nombre: /Perfil Renal|Creatinina/i });
   const exHemograma  = await ExamenLaboratorioImagen.findOne({ nombre: /Hemograma/i });
   const exInsulina   = await ExamenLaboratorioImagen.findOne({ nombre: /Insulina/i });
-  const exECG        = await ExamenLaboratorioImagen.findOne({ nombre: /Electrocardiograma/i });
+  const exECG        = await ExamenLaboratorioImagen.findOne({ nombre: /Electrocardiograma|ECG/i });
   const exHolter     = await ExamenLaboratorioImagen.findOne({ nombre: /Holter/i });
 
   const mkItem = (examen: any, seccion: "LAB" | "IMAGEN", obs = "", completado = false, valor = "", unidad = "") => ({

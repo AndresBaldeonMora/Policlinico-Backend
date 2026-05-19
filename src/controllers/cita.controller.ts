@@ -112,6 +112,19 @@ export const reprogramarCita = async (req: Request, res: Response) => {
     const cita = await Cita.findById(id);
     if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
 
+    // Regla de negocio: solo se puede reprogramar hasta 24h antes de la cita.
+    // `hora` es hora local de Perú (UTC-5); `fecha` es medianoche UTC del día.
+    const [horaActual, minActual] = (cita.hora ?? "23:59").split(":").map(Number);
+    const momentoCita = new Date(cita.fecha);
+    momentoCita.setUTCHours(horaActual + 5, minActual, 0, 0);
+    const horasRestantes = (momentoCita.getTime() - Date.now()) / (1000 * 60 * 60);
+    if (horasRestantes < 24) {
+      return res.status(400).json({
+        success: false,
+        message: "No se puede reprogramar: la cita debe reprogramarse con al menos 24 horas de anticipación.",
+      });
+    }
+
     const fechaUTC = crearFechaUTC(fecha);
     if (isNaN(fechaUTC.getTime())) {
       return res.status(400).json({ success: false, message: "Formato de nueva fecha inválido" });

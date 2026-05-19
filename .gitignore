@@ -6,3 +6,4 @@ dist/
 coverage/
 .claude
 REACT_DOCTOR_REPORT.md
+src/config/seedPacienteDemo.ts

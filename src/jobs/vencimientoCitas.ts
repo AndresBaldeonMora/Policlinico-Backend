@@ -22,10 +22,12 @@ export const verificarCitasVencidas = async (): Promise<number> => {
   let vencidas = 0;
 
   for (const cita of citasAbiertas) {
-    // Reconstruir el datetime exacto de la cita (fecha + hora)
+    // Reconstruir el datetime exacto de la cita (fecha + hora).
+    // `hora` es hora local de Perú (UTC-5); `fecha` es medianoche UTC del día.
+    // Sumamos 5h para convertir la hora local al instante UTC real.
     const [horas, minutos] = (cita.hora ?? "23:59").split(":").map(Number);
     const citaMomento = new Date(cita.fecha);
-    citaMomento.setUTCHours(horas, minutos, 0, 0);
+    citaMomento.setUTCHours(horas + 5, minutos, 0, 0);
 
     // Gracia: 30 minutos después de la hora programada
     const limite = new Date(citaMomento.getTime() + 30 * 60 * 1000);
