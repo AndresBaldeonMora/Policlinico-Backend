@@ -16,8 +16,32 @@ export interface ICita extends Document {
 
   // Campos clínicos (llena el médico)
   notasClinicas?: string;      // Observaciones clínicas libres
-  diagnostico?: string;        // Diagnóstico principal CIE-10 o texto libre
+  diagnostico?: string;        // Diagnóstico principal en texto (para visualización rápida)
   tratamiento?: string;        // Plan de tratamiento
+
+  // Diagnósticos CIE-10 estructurados — consultables y auditables (NTS-022, NTS-139)
+  diagnosticos?: {
+    codigo: string;            // Código CIE-10 oficial (ej. "E11.9")
+    descripcion: string;       // Descripción oficial del código
+    tipo: "presuntivo" | "confirmado";
+    esPrincipal: boolean;      // true = diagnóstico principal de la consulta
+  }[];
+
+  // Firma electrónica del médico responsable — se estampa al finalizar (NTS-022 Art. 8)
+  firma?: {
+    medicoId: mongoose.Types.ObjectId;
+    medicoNombre: string;      // Nombre completo del médico al momento de firmar
+    numeroCMP: string;         // N° de colegiatura del Colegio Médico del Perú
+    fechaHoraFirma: Date;
+  };
+
+  // Datos de la sección de especialidad (NTS-022) — fuera del blob JSON.
+  // Los campos son flexibles por especialidad; se irán tipando especialidad
+  // por especialidad a medida que cada una se valide contra su fuente clínica.
+  especialidad?: {
+    nombre: string;                    // Especialidad del formulario usado
+    campos: Record<string, string>;    // Pares campo→valor de la sección E
+  };
 
   // Campos de flujo
   horarioAsistencia?: Date;    // Timestamp de confirmación de asistencia
@@ -97,6 +121,29 @@ const citaSchema = new Schema<ICita>(
     notasClinicas:     { type: String, default: "" },
     diagnostico:       { type: String, default: "" },
     tratamiento:       { type: String, default: "" },
+
+    // Diagnósticos CIE-10 estructurados
+    diagnosticos: [{
+      codigo:      { type: String, required: true },
+      descripcion: { type: String, required: true },
+      tipo:        { type: String, enum: ["presuntivo", "confirmado"], default: "presuntivo" },
+      esPrincipal: { type: Boolean, default: false },
+    }],
+
+    // Firma electrónica del médico (NTS-022 Art. 8)
+    firma: {
+      medicoId:       { type: Schema.Types.ObjectId, ref: "Doctor" },
+      medicoNombre:   { type: String },
+      numeroCMP:      { type: String },
+      fechaHoraFirma: { type: Date },
+    },
+
+    // Datos de la sección de especialidad (NTS-022)
+    especialidad: {
+      nombre: { type: String },
+      campos: { type: Schema.Types.Mixed, default: {} },
+    },
+
     horarioAsistencia: { type: Date, required: false },
     motivoCancelacion: { type: String, required: false },
 
@@ -128,5 +175,8 @@ citaSchema.index(
   { doctorId: 1, fecha: 1, hora: 1 },
   { unique: true, partialFilterExpression: { doctorId: { $type: "objectId" } } }
 );
+
+// Índice para reportes de morbilidad por código CIE-10 (NTS-139)
+citaSchema.index({ "diagnosticos.codigo": 1 });
 
 export const Cita = mongoose.model<ICita>("Cita", citaSchema);

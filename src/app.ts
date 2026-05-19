@@ -17,6 +17,7 @@ import examenRoutes from "./routes/examen.routes";
 import ordenRoutes from "./routes/orden.routes";
 import reportesRoutes from "./routes/reportes.routes";
 import medicamentoRoutes from "./routes/medicamento.routes";
+import cie10Routes from "./routes/cie10.routes";
 import { errorHandler } from "./middlewares/errorHandler";
 
 const app = express();
@@ -83,6 +84,7 @@ app.use("/api/examenes", examenRoutes);
 app.use("/api/ordenes", ordenRoutes);
 app.use("/api/reportes", reportesRoutes);
 app.use("/api/medicamentos", medicamentoRoutes);
+app.use("/api/cie10", cie10Routes);
 
 app.use(errorHandler);
 

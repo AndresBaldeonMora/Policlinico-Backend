@@ -77,9 +77,29 @@ export const actualizarEstadoCita = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: "Estado inválido" });
     }
 
+    const update: any = { estado };
+
+    // Al finalizar (ATENDIDA) se estampa la firma electrónica del médico (NTS-022 Art. 8)
+    if (estado === "ATENDIDA") {
+      const doctorId = getDoctorId(req);
+      if (!doctorId) {
+        return res.status(403).json({ success: false, message: "Usuario no vinculado a un perfil médico" });
+      }
+      const doctor = await Doctor.findById(doctorId);
+      if (!doctor) {
+        return res.status(404).json({ success: false, message: "Perfil de médico no encontrado" });
+      }
+      update.firma = {
+        medicoId:       doctor._id,
+        medicoNombre:   `${doctor.nombres} ${doctor.apellidos}`,
+        numeroCMP:      doctor.cmp ?? "",
+        fechaHoraFirma: new Date(),
+      };
+    }
+
     const cita = await Cita.findByIdAndUpdate(
       id,
-      { estado },
+      update,
       { new: true }
     ).populate("pacienteId", "nombres apellidos dni telefono");
 
@@ -119,11 +139,11 @@ export const prescribirMedicamentos = async (req: Request, res: Response) => {
 export const guardarNotasClinicas = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { notasClinicas, diagnostico, tratamiento } = req.body;
+    const { notasClinicas, diagnostico, tratamiento, diagnosticos, especialidad } = req.body;
 
     const cita = await Cita.findByIdAndUpdate(
       id,
-      { notasClinicas, diagnostico, tratamiento },
+      { notasClinicas, diagnostico, tratamiento, diagnosticos, especialidad },
       { new: true }
     ).populate("pacienteId", "nombres apellidos dni telefono");
 
