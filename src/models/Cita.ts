@@ -27,6 +27,15 @@ export interface ICita extends Document {
     esPrincipal: boolean;      // true = diagnóstico principal de la consulta
   }[];
 
+  // Grupo "Otros diagnósticos" — NTS-022, Formato de Consulta Externa
+  otrosDiagnosticos?: {
+    riesgo?: string;
+    nutricional?: string;
+    saludMental?: string;
+    causaExterna?: string;
+    estadoFuncional?: string;
+  };
+
   // Firma electrónica del médico responsable — se estampa al finalizar (NTS-022 Art. 8)
   firma?: {
     medicoId: mongoose.Types.ObjectId;
@@ -129,6 +138,15 @@ const citaSchema = new Schema<ICita>(
       tipo:        { type: String, enum: ["presuntivo", "confirmado"], default: "presuntivo" },
       esPrincipal: { type: Boolean, default: false },
     }],
+
+    // Grupo "Otros diagnósticos" (NTS-022, Formato de Consulta Externa)
+    otrosDiagnosticos: {
+      riesgo:          { type: String, default: "" },
+      nutricional:     { type: String, default: "" },
+      saludMental:     { type: String, default: "" },
+      causaExterna:    { type: String, default: "" },
+      estadoFuncional: { type: String, default: "" },
+    },
 
     // Firma electrónica del médico (NTS-022 Art. 8)
     firma: {

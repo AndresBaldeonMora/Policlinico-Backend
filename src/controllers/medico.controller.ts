@@ -139,11 +139,11 @@ export const prescribirMedicamentos = async (req: Request, res: Response) => {
 export const guardarNotasClinicas = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { notasClinicas, diagnostico, tratamiento, diagnosticos, especialidad } = req.body;
+    const { notasClinicas, diagnostico, tratamiento, diagnosticos, especialidad, otrosDiagnosticos } = req.body;
 
     const cita = await Cita.findByIdAndUpdate(
       id,
-      { notasClinicas, diagnostico, tratamiento, diagnosticos, especialidad },
+      { notasClinicas, diagnostico, tratamiento, diagnosticos, especialidad, otrosDiagnosticos },
       { new: true }
     ).populate("pacienteId", "nombres apellidos dni telefono");
 
