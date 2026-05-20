@@ -11,6 +11,8 @@ export interface IMedicamentoHabitual {
   dosis: string;
   frecuencia: string;
   activo: boolean;
+  fechaSuspension?: Date;
+  motivoSuspension?: string;
 }
 
 export interface IProblemaMedico {
@@ -80,10 +82,12 @@ const pacienteSchema = new Schema<IPaciente>(
       severidad: { type: String, enum: ["leve", "moderada", "severa"], default: "leve" },
     }],
     medicamentosHabituales: [{
-      nombre:    { type: String, trim: true, required: true },
-      dosis:     { type: String, trim: true, default: "" },
-      frecuencia:{ type: String, trim: true, default: "" },
-      activo:    { type: Boolean, default: true },
+      nombre:             { type: String, trim: true, required: true },
+      dosis:              { type: String, trim: true, default: "" },
+      frecuencia:         { type: String, trim: true, default: "" },
+      activo:             { type: Boolean, default: true },
+      fechaSuspension:    { type: Date },
+      motivoSuspension:   { type: String, trim: true, default: "" },
     }],
     problemasMedicos: [{
       descripcion: { type: String, trim: true, required: true },
