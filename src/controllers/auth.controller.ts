@@ -97,6 +97,11 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Credenciales inválidas" });
     }
 
+    // Cuentas desactivadas por el administrador no pueden iniciar sesión.
+    if (user.activo === false) {
+      return res.status(403).json({ message: "Esta cuenta ha sido desactivada. Contacta al administrador." });
+    }
+
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
       return res.status(401).json({ message: "Credenciales inválidas" });
@@ -123,6 +128,7 @@ export const login = async (req: Request, res: Response) => {
         apellidos: user.apellidos,
         correo: user.correo,
         rol: user.rol,
+        debeCambiarPassword: user.debeCambiarPassword ?? false,
         medicoId: user.medicoId,
         pacienteId: user.pacienteId,
       },

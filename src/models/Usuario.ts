@@ -8,6 +8,8 @@ export interface IUsuario extends Document {
   correo: string;
   passwordHash: string;
   rol: RolUsuario;
+  activo: boolean;
+  debeCambiarPassword: boolean;
   medicoId?: mongoose.Types.ObjectId;
   pacienteId?: mongoose.Types.ObjectId;
 }
@@ -23,6 +25,11 @@ const usuarioSchema = new Schema<IUsuario>(
       enum: ["RECEPCIONISTA", "MEDICO", "PACIENTE", "ADMINISTRADOR"],
       required: true,
     },
+    // Soft-disable: una cuenta inactiva no puede iniciar sesión, pero se conserva
+    // para mantener la integridad referencial de la auditoría y el histórico.
+    activo: { type: Boolean, default: true },
+    // Fuerza el cambio de clave en el próximo login (tras un reseteo administrativo).
+    debeCambiarPassword: { type: Boolean, default: false },
     medicoId: {
       type: Schema.Types.ObjectId,
       ref: "Doctor",
