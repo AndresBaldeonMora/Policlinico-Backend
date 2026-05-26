@@ -19,6 +19,7 @@ import reportesRoutes from "./routes/reportes.routes";
 import medicamentoRoutes from "./routes/medicamento.routes";
 import cie10Routes from "./routes/cie10.routes";
 import adminRoutes from "./routes/admin.routes";
+import interconsultaRoutes from "./routes/interconsulta.routes";
 import { errorHandler } from "./middlewares/errorHandler";
 
 const app = express();
@@ -87,6 +88,7 @@ app.use("/api/reportes", reportesRoutes);
 app.use("/api/medicamentos", medicamentoRoutes);
 app.use("/api/cie10", cie10Routes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/interconsultas", interconsultaRoutes);
 
 app.use(errorHandler);
 

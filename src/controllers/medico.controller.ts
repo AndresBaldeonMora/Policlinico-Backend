@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import mongoose from "mongoose";
 import { Cita, ICita } from "../models/Cita";
 import { Doctor } from "../models/Doctor";
+import { OrdenExamen } from "../models/OrdenExamen";
 import { AuthRequest } from "../middlewares/authMiddlewares";
 
 const getDoctorId = (req: Request): string | null => {
@@ -234,6 +235,28 @@ export const obtenerDetalleCita = async (req: Request, res: Response) => {
     }
 
     res.json({ success: true, data });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Resultados de exámenes recientemente finalizados de las órdenes emitidas por el médico.
+// Alimenta la bandeja del dashboard ("resultados listos para revisar").
+export const obtenerResultadosRecientes = async (req: Request, res: Response) => {
+  try {
+    const doctorId = getDoctorId(req);
+    if (!doctorId) {
+      return res.status(403).json({ success: false, message: "No autorizado" });
+    }
+
+    const ordenes = await OrdenExamen.find({ doctorId, estado: "FINALIZADO" })
+      .populate("pacienteId", "nombres apellidos dni")
+      .populate("especialidadId", "nombre")
+      .populate("items.examenId", "nombre tipo")
+      .sort({ fechaResultados: -1 })
+      .limit(20);
+
+    res.json({ success: true, data: ordenes });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

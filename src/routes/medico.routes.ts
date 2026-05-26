@@ -8,6 +8,7 @@ import {
   guardarNotasClinicas,
   prescribirMedicamentos,
   obtenerHistorialCitasPaciente,
+  obtenerResultadosRecientes,
 } from "../controllers/medico.controller";
 import { verifyToken, requireRole } from "../middlewares/authMiddlewares";
 
@@ -23,6 +24,9 @@ router.get("/perfil", obtenerMiPerfil);
 // Citas
 router.get("/citas", obtenerMisCitas);
 router.get("/citas-hoy", obtenerCitasHoy);
+
+// Resultados de laboratorio/imagen recientemente finalizados (bandeja del dashboard)
+router.get("/resultados-recientes", obtenerResultadosRecientes);
 router.get("/citas/:id", obtenerDetalleCita);
 router.patch("/citas/:id/estado", actualizarEstadoCita);
 router.patch("/citas/:id/notas", guardarNotasClinicas);
