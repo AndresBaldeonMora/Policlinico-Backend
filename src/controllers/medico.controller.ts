@@ -4,6 +4,8 @@ import { Cita, ICita } from "../models/Cita";
 import { Doctor } from "../models/Doctor";
 import { OrdenExamen } from "../models/OrdenExamen";
 import { AuthRequest } from "../middlewares/authMiddlewares";
+import { generarPDFReceta } from "../config/pdfReceta";
+import { enviarCorreoReceta } from "../config/mailer";
 
 const getDoctorId = (req: Request): string | null => {
   const user = (req as AuthRequest).user;
@@ -190,11 +192,18 @@ export const prescribirMedicamentos = async (req: Request, res: Response) => {
 export const guardarNotasClinicas = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { notasClinicas, diagnostico, tratamiento, diagnosticos, especialidad, otrosDiagnosticos } = req.body;
+    const { notasClinicas, diagnostico, tratamiento, diagnosticos, especialidad, otrosDiagnosticos, medicamentosPrescritos } = req.body;
+
+    const update: any = { notasClinicas, diagnostico, tratamiento, diagnosticos, especialidad, otrosDiagnosticos };
+    // Persistir los medicamentos en el campo estructurado (Receta Única Estandarizada),
+    // además del blob en notasClinicas. Solo si el cliente los envía.
+    if (Array.isArray(medicamentosPrescritos)) {
+      update.medicamentosPrescritos = medicamentosPrescritos;
+    }
 
     const cita = await Cita.findByIdAndUpdate(
       id,
-      { notasClinicas, diagnostico, tratamiento, diagnosticos, especialidad, otrosDiagnosticos },
+      update,
       { new: true }
     ).populate("pacienteId", "nombres apellidos dni telefono");
 
@@ -256,6 +265,82 @@ export const obtenerResultadosRecientes = async (req: Request, res: Response) =>
       .limit(20);
 
     res.json({ success: true, data: ordenes });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Genera y transmite la Receta Única Estandarizada (PDF) de una cita.
+// Usa los medicamentos estructurados (medicamentosPrescritos) persistidos en la cita.
+export const generarReceta = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const cita = await Cita.findById(id)
+      .populate("pacienteId", "nombres apellidos dni correo fechaNacimiento sexo direccion")
+      .populate({
+        path: "doctorId",
+        select: "nombres apellidos cmp especialidadId",
+        populate: { path: "especialidadId", select: "nombre" },
+      });
+
+    if (!cita) {
+      return res.status(404).json({ success: false, message: "Cita no encontrada" });
+    }
+
+    const meds = cita.medicamentosPrescritos ?? [];
+    if (meds.length === 0) {
+      return res.status(400).json({ success: false, message: "La cita no tiene medicamentos prescritos" });
+    }
+
+    const pac: any = cita.pacienteId;
+    const doc: any = cita.doctorId;
+
+    const datosReceta = {
+      numeroReceta: `R-${String(cita._id).slice(-6).toUpperCase()}`,
+      fecha: (cita.firma?.fechaHoraFirma ?? cita.fecha ?? new Date()).toISOString(),
+      paciente: {
+        nombres: pac?.nombres ?? "",
+        apellidos: pac?.apellidos ?? "",
+        dni: pac?.dni ?? "",
+        fechaNacimiento: pac?.fechaNacimiento ? new Date(pac.fechaNacimiento).toISOString() : undefined,
+        sexo: pac?.sexo ?? "",
+        direccion: pac?.direccion ?? "",
+      },
+      doctor: {
+        nombres: doc?.nombres ?? cita.firma?.medicoNombre ?? "",
+        apellidos: doc?.apellidos ?? "",
+        cmp: doc?.cmp ?? cita.firma?.numeroCMP ?? "",
+      },
+      especialidad: doc?.especialidadId?.nombre ?? cita.especialidad?.nombre ?? "",
+      diagnosticos: (cita.diagnosticos ?? []).map((d) => ({ codigo: d.codigo, descripcion: d.descripcion })),
+      medicamentos: meds.map((m) => ({
+        nombre: m.nombre,
+        dci: m.dci,
+        concentracion: m.concentracion,
+        formaFarmaceutica: m.formaFarmaceutica,
+        viaAdministracion: m.viaAdministracion,
+        dosis: m.dosis,
+        frecuencia: m.frecuencia,
+        duracion: m.duracion,
+        cantidad: m.cantidad,
+        observaciones: m.observaciones,
+      })),
+    };
+
+    const pdf = await generarPDFReceta(datosReceta);
+
+    // Enviar copia al correo del paciente si tiene uno registrado (sin bloquear la respuesta)
+    const correo = pac?.correo;
+    if (correo) {
+      enviarCorreoReceta(correo, datosReceta).catch((err) =>
+        console.error("Error enviando receta por correo:", err)
+      );
+    }
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="Receta_${String(cita._id).slice(-6)}.pdf"`);
+    res.send(pdf);
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

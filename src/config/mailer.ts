@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { generarPDFResultados } from "./pdfResultados";
+import { generarPDFReceta, DatosReceta } from "./pdfReceta";
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -79,6 +80,29 @@ export const enviarCorreoResultados = async (datos: DatosCorreoResultados) => {
     subject: `Resultados de Laboratorio / Imagen — ${codigoOrden} | Policlínico San José`,
     html,
     attachments: adjuntos,
+  });
+};
+
+export const enviarCorreoReceta = async (correo: string, datos: DatosReceta) => {
+  const pdfBuffer = await generarPDFReceta(datos);
+  const paciente = datos.paciente;
+  const html = `
+    <p>Estimado(a) <strong>${paciente.nombres} ${paciente.apellidos}</strong>,</p>
+    <p>Adjunto encontrará su receta médica (N° ${datos.numeroReceta}) emitida el ${new Date(datos.fecha).toLocaleDateString("es-PE", { timeZone: "UTC" })}.</p>
+    <p>Preséntela en la farmacia para la dispensación de sus medicamentos.</p>
+    <br>
+    <p>Atentamente,<br><strong>Policlínico Parroquial San José</strong></p>
+    <p style="color:#999;font-size:12px">Este es un correo automático, por favor no responda a este mensaje.</p>
+  `;
+
+  await transporter.sendMail({
+    from: `"Policlínico San José" <${process.env.SMTP_USER}>`,
+    to: correo,
+    subject: `Receta Médica N° ${datos.numeroReceta} | Policlínico San José`,
+    html,
+    attachments: [
+      { filename: `Receta_${datos.numeroReceta}.pdf`, content: pdfBuffer, contentType: "application/pdf" },
+    ],
   });
 };
 
