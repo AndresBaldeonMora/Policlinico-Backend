@@ -1,58 +1,51 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { Usuario, RolUsuario } from "../models/Usuario";
+import { Usuario } from "../models/Usuario";
 import { Paciente } from "../models/Paciente";
+import { getJwtSecret } from "../middlewares/authMiddlewares";
 
-const JWT_SECRET = process.env.JWT_SECRET || "super_secret_change_this";
-
-const ROLES_VALIDOS: RolUsuario[] = ["RECEPCIONISTA", "MEDICO", "PACIENTE", "ADMINISTRADOR"];
+const JWT_SECRET = getJwtSecret();
 
 // --------------------------------------------------
-// 1. REGISTRAR NUEVOS USUARIOS
-//    - PACIENTE requiere `dni` para vincular con un Paciente existente
-//    - MEDICO puede recibir `medicoId` (opcional)
+// 1. REGISTRAR (público) → SÓLO PACIENTE
+//    Los demás roles (MEDICO, RECEPCIONISTA, ADMINISTRADOR) se crean
+//    desde el panel de administración (`/api/admin/usuarios`).
 // --------------------------------------------------
 export const register = async (req: Request, res: Response) => {
   try {
-    const { nombres, apellidos, correo, password, rol, dni, medicoId } = req.body;
+    const { nombres, apellidos, password, dni } = req.body;
+    const correo = typeof req.body.correo === "string" ? req.body.correo : "";
 
-    if (!nombres || !apellidos || !correo || !password || !rol) {
+    if (!nombres || !apellidos || !correo || !password || !dni) {
       return res.status(400).json({ message: "Todos los campos son requeridos" });
     }
 
-    const rolUpper = String(rol).toUpperCase() as RolUsuario;
-    if (!ROLES_VALIDOS.includes(rolUpper)) {
-      return res.status(400).json({ message: "El rol proporcionado no es válido" });
+    // Defensa anti-NoSQL injection: forzamos tipos string.
+    if (typeof password !== "string" || typeof dni !== "string" || password.length < 8) {
+      return res.status(400).json({ message: "Credenciales inválidas" });
     }
 
-    const existingUser = await Usuario.findOne({ correo: correo.toLowerCase() });
+    const correoNorm = correo.toLowerCase().trim();
+
+    const existingUser = await Usuario.findOne({ correo: correoNorm });
     if (existingUser) {
-      return res.status(400).json({ message: "El correo ya está en uso" });
+      // Mensaje genérico para evitar enumeración de correos.
+      return res.status(400).json({ message: "No se puede crear la cuenta. Verifica los datos o contacta a recepción." });
     }
 
-    // Si es PACIENTE, vincular con Paciente existente por DNI
-    let pacienteIdRef: any = undefined;
-    if (rolUpper === "PACIENTE") {
-      if (!dni) {
-        return res.status(400).json({
-          message: "El DNI es requerido para registrar un paciente",
-        });
-      }
-      const paciente = await Paciente.findOne({ dni: String(dni).trim() });
-      if (!paciente) {
-        return res.status(404).json({
-          message: "No existe un paciente registrado con ese DNI. Contacta a recepción.",
-        });
-      }
-      // No permitir doble cuenta para el mismo paciente
-      const yaVinculado = await Usuario.findOne({ pacienteId: paciente._id });
-      if (yaVinculado) {
-        return res.status(400).json({
-          message: "Este paciente ya tiene una cuenta registrada",
-        });
-      }
-      pacienteIdRef = paciente._id;
+    // Sólo se vincula con Paciente preexistente (creado por recepción).
+    const paciente = await Paciente.findOne({ dni: dni.trim() });
+    if (!paciente) {
+      return res.status(400).json({
+        message: "No se puede crear la cuenta. Verifica los datos o contacta a recepción.",
+      });
+    }
+    const yaVinculado = await Usuario.findOne({ pacienteId: paciente._id });
+    if (yaVinculado) {
+      return res.status(400).json({
+        message: "No se puede crear la cuenta. Verifica los datos o contacta a recepción.",
+      });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -61,11 +54,10 @@ export const register = async (req: Request, res: Response) => {
     const newUser = new Usuario({
       nombres,
       apellidos,
-      correo: correo.toLowerCase(),
+      correo: correoNorm,
       passwordHash,
-      rol: rolUpper,
-      pacienteId: pacienteIdRef,
-      medicoId: rolUpper === "MEDICO" ? medicoId : undefined,
+      rol: "PACIENTE",
+      pacienteId: paciente._id,
     });
 
     const savedUser = await newUser.save();
@@ -77,7 +69,6 @@ export const register = async (req: Request, res: Response) => {
       correo: savedUser.correo,
       rol: savedUser.rol,
       pacienteId: savedUser.pacienteId,
-      medicoId: savedUser.medicoId,
     });
   } catch (error) {
     console.error("Error en register:", error);
@@ -90,21 +81,29 @@ export const register = async (req: Request, res: Response) => {
 // --------------------------------------------------
 export const login = async (req: Request, res: Response) => {
   try {
-    const { correo, password } = req.body;
+    const { password } = req.body;
+    const correo = typeof req.body.correo === "string" ? req.body.correo : "";
 
-    const user = await Usuario.findOne({ correo: correo.toLowerCase() });
-    if (!user) {
+    // Tipos forzados — bloquea {correo:{$gt:""}} y demás operadores NoSQL.
+    if (typeof password !== "string" || !correo || !password) {
       return res.status(401).json({ message: "Credenciales inválidas" });
     }
 
-    // Cuentas desactivadas por el administrador no pueden iniciar sesión.
+    const correoNorm = correo.toLowerCase().trim();
+    const user = await Usuario.findOne({ correo: correoNorm });
+
+    // Hash dummy de longitud comparable para evitar timing attack:
+    // ejecutamos bcrypt.compare aunque el usuario no exista.
+    const dummyHash = "$2a$10$abcdefghijklmnopqrstuv1234567890abcdefghijklmnopqrstuv";
+    const passwordHash = user?.passwordHash ?? dummyHash;
+    const isValid = await bcrypt.compare(password, passwordHash);
+
+    if (!user || !isValid) {
+      return res.status(401).json({ message: "Credenciales inválidas" });
+    }
+
     if (user.activo === false) {
       return res.status(403).json({ message: "Esta cuenta ha sido desactivada. Contacta al administrador." });
-    }
-
-    const isValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isValid) {
-      return res.status(401).json({ message: "Credenciales inválidas" });
     }
 
     const token = jwt.sign(
@@ -117,7 +116,7 @@ export const login = async (req: Request, res: Response) => {
         pacienteId: user.pacienteId ? String(user.pacienteId) : undefined,
       },
       JWT_SECRET,
-      { expiresIn: "8h" }
+      { algorithm: "HS256", expiresIn: "8h" }
     );
 
     res.json({

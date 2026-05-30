@@ -57,11 +57,30 @@ export interface IPaciente extends Document {
 
 const pacienteSchema = new Schema<IPaciente>(
   {
-    nombres:    { type: String, required: true, trim: true },
-    apellidos:  { type: String, required: true, trim: true },
-    dni:        { type: String, required: true, unique: true, trim: true },
-    telefono: { type: String, trim: true, unique: true, sparse: true },
-    correo:   { type: String, trim: true, lowercase: true, unique: true, sparse: true },
+    nombres:    { type: String, required: true, trim: true, maxlength: 80 },
+    apellidos:  { type: String, required: true, trim: true, maxlength: 80 },
+    dni:        {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      match: [/^\d{8}$/, "El DNI debe tener exactamente 8 dígitos"],
+    },
+    telefono: {
+      type: String,
+      trim: true,
+      unique: true,
+      sparse: true,
+      match: [/^\d{6,15}$/, "El teléfono debe contener entre 6 y 15 dígitos"],
+    },
+    correo: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      unique: true,
+      sparse: true,
+      match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Correo inválido"],
+    },
     fechaNacimiento: { type: Date },
     sexo:       { type: String, enum: ["M", "F", ""], default: "" },
     estadoCivil: {
@@ -76,33 +95,53 @@ const pacienteSchema = new Schema<IPaciente>(
     apoderadoParentesco:  { type: String, trim: true, default: "" },
     apoderadoTelefono:    { type: String, trim: true, default: "" },
     avatar:               { type: String, default: null },
-    alergias: [{
-      sustancia: { type: String, trim: true, required: true },
-      reaccion:  { type: String, trim: true, default: "" },
-      severidad: { type: String, enum: ["leve", "moderada", "severa"], default: "leve" },
-    }],
-    medicamentosHabituales: [{
-      nombre:             { type: String, trim: true, required: true },
-      dosis:              { type: String, trim: true, default: "" },
-      frecuencia:         { type: String, trim: true, default: "" },
-      activo:             { type: Boolean, default: true },
-      fechaSuspension:    { type: Date },
-      motivoSuspension:   { type: String, trim: true, default: "" },
-    }],
-    problemasMedicos: [{
-      descripcion: { type: String, trim: true, required: true },
-      estado:      { type: String, enum: ["activo", "resuelto"], default: "activo" },
-      fechaInicio: { type: Date },
-    }],
-    cirugiasPrevias: [{
-      procedimiento: { type: String, trim: true, required: true },
-      fecha:         { type: Date },
-      hospital:      { type: String, trim: true, default: "" },
-    }],
-    antecedentesFamiliares: [{
-      parentesco: { type: String, trim: true, required: true },
-      condicion:  { type: String, trim: true, required: true },
-    }],
+    alergias: {
+      type: [{
+        sustancia: { type: String, trim: true, required: true, maxlength: 120 },
+        reaccion:  { type: String, trim: true, default: "", maxlength: 240 },
+        severidad: { type: String, enum: ["leve", "moderada", "severa"], default: "leve" },
+      }],
+      validate: { validator: (v: any[]) => v.length <= 100, message: "Máximo 100 alergias por paciente" },
+      default: [],
+    },
+    medicamentosHabituales: {
+      type: [{
+        nombre:             { type: String, trim: true, required: true, maxlength: 120 },
+        dosis:              { type: String, trim: true, default: "", maxlength: 60 },
+        frecuencia:         { type: String, trim: true, default: "", maxlength: 60 },
+        activo:             { type: Boolean, default: true },
+        fechaSuspension:    { type: Date },
+        motivoSuspension:   { type: String, trim: true, default: "", maxlength: 240 },
+      }],
+      validate: { validator: (v: any[]) => v.length <= 200, message: "Máximo 200 medicamentos por paciente" },
+      default: [],
+    },
+    problemasMedicos: {
+      type: [{
+        descripcion: { type: String, trim: true, required: true, maxlength: 240 },
+        estado:      { type: String, enum: ["activo", "resuelto"], default: "activo" },
+        fechaInicio: { type: Date },
+      }],
+      validate: { validator: (v: any[]) => v.length <= 200, message: "Máximo 200 problemas médicos por paciente" },
+      default: [],
+    },
+    cirugiasPrevias: {
+      type: [{
+        procedimiento: { type: String, trim: true, required: true, maxlength: 240 },
+        fecha:         { type: Date },
+        hospital:      { type: String, trim: true, default: "", maxlength: 120 },
+      }],
+      validate: { validator: (v: any[]) => v.length <= 100, message: "Máximo 100 cirugías por paciente" },
+      default: [],
+    },
+    antecedentesFamiliares: {
+      type: [{
+        parentesco: { type: String, trim: true, required: true, maxlength: 60 },
+        condicion:  { type: String, trim: true, required: true, maxlength: 240 },
+      }],
+      validate: { validator: (v: any[]) => v.length <= 200, message: "Máximo 200 antecedentes familiares" },
+      default: [],
+    },
   },
   {
     timestamps: true,

@@ -49,6 +49,8 @@ export interface IOrdenExamen extends Document {
   salaEquipo?: string;           // Sala o equipo asignado
   // Resultado global (PDF de la orden completa)
   archivoResultadoUrl?: string;
+  archivoResultadoPublicId?: string;
+  archivoResultadoResourceType?: "raw" | "image";
   // Campos heredados / compatibilidad
   citaLabId?: mongoose.Types.ObjectId;
   motivoVencimiento?: string;
@@ -113,7 +115,10 @@ const ordenExamenSchema = new Schema<IOrdenExamen>(
     citaImagenFecha:      { type: Date },
     duracionEstimadaMin:  { type: Number, min: 1 },
     salaEquipo:           { type: String, trim: true },
-    archivoResultadoUrl:{ type: String, trim: true },
+    archivoResultadoUrl:        { type: String, trim: true },
+    // Identifica el recurso en Cloudinary para firmar URLs temporales.
+    archivoResultadoPublicId:   { type: String, trim: true },
+    archivoResultadoResourceType: { type: String, enum: ["raw", "image"], default: "raw" },
     // Compatibilidad
     citaLabId:          { type: Schema.Types.ObjectId, ref: "Cita" },
     motivoVencimiento:  { type: String, trim: true },
@@ -128,5 +133,12 @@ const ordenExamenSchema = new Schema<IOrdenExamen>(
   },
   { timestamps: true }
 );
+
+// Performance: queries frecuentes desde portal médico, paciente y reportes.
+ordenExamenSchema.index({ pacienteId: 1, createdAt: -1 });
+ordenExamenSchema.index({ doctorId: 1, estado: 1, createdAt: -1 });
+ordenExamenSchema.index({ citaId: 1 });
+ordenExamenSchema.index({ estado: 1, fechaVencimiento: 1 });
+ordenExamenSchema.index({ especialidadId: 1, estado: 1 });
 
 export const OrdenExamen = mongoose.model<IOrdenExamen>("OrdenExamen", ordenExamenSchema);

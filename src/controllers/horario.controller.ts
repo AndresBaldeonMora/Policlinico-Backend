@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
-import { Horario } from "../models/Horario"; // Asegúrate de tener este modelo creado
-import { Doctor } from "../models/Doctor";
+import { Horario } from "../models/Horario";
 
 // Crear horario
 export const crearHorario = async (req: Request, res: Response) => {
@@ -110,33 +109,36 @@ export const verificarDisponibilidad = async (req: Request, res: Response) => {
   }
 };
 
-// Reservar horario
-export const reservarHorario = async (req: Request, res: Response) => {
+// Reservar horario — atómico (anti race condition) + ownership del paciente.
+export const reservarHorario = async (req: any, res: Response) => {
   try {
     const { doctorId, fecha, hora } = req.body;
 
-    const horario = await Horario.findOne({
-      doctorId,
-      fecha,
-      hora,
-    });
+    // Si el rol es PACIENTE y se envió pacienteId en el body, forzar al del token.
+    const rol = String(req.user?.rol ?? "").toUpperCase();
+    if (rol === "PACIENTE" && req.body.pacienteId
+        && String(req.body.pacienteId) !== String(req.user?.pacienteId)) {
+      return res.status(403).json({
+        success: false,
+        message: "Sólo puedes reservar a tu propio nombre",
+      });
+    }
+
+    // Atómico: actualiza sólo si el slot está libre.
+    const horario = await Horario.findOneAndUpdate(
+      { doctorId, fecha, hora, reservado: { $ne: true } },
+      { $set: { reservado: true } },
+      { new: true }
+    );
 
     if (!horario) {
-      return res.status(404).json({
-        success: false,
-        message: "Horario no encontrado",
-      });
+      // Distinguir 404 (slot inexistente) de 409 (ya reservado por carrera).
+      const existe = await Horario.findOne({ doctorId, fecha, hora }).lean();
+      if (!existe) {
+        return res.status(404).json({ success: false, message: "Horario no encontrado" });
+      }
+      return res.status(409).json({ success: false, message: "Este horario ya está reservado" });
     }
-
-    if (horario.reservado) {
-      return res.status(400).json({
-        success: false,
-        message: "Este horario ya está reservado",
-      });
-    }
-
-    horario.reservado = true; // Marcamos el horario como reservado
-    await horario.save();
 
     res.status(200).json({
       success: true,

@@ -1,10 +1,12 @@
 import { Request, Response } from "express";
+import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import { Paciente } from "../models/Paciente";
 import { Cita } from "../models/Cita";
 import { OrdenExamen } from "../models/OrdenExamen";
 import { Usuario } from "../models/Usuario";
 import { generarPasswordTemporal } from "../utils/generarPasswordTemporal";
+import { AuthRequest } from "../middlewares/authMiddlewares";
 
 // ─── Validaciones ─────────────────────────────────────────
 const soloLetras    = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/;
@@ -26,6 +28,23 @@ const validarPaciente = (body: any, esActualizacion = false): string | null => {
 
   return null;
 };
+
+// Whitelist de campos editables en crear/actualizar paciente.
+// Bloquea mass assignment de campos sensibles (historiaClinica, rol, etc.).
+const CAMPOS_PACIENTE_PERMITIDOS = [
+  "nombres", "apellidos", "dni", "fechaNacimiento", "sexo",
+  "telefono", "correo", "direccion",
+  "alergias", "medicamentosHabituales", "problemasMedicos",
+  "cirugiasPrevias", "antecedentesFamiliares",
+] as const;
+
+function whitelistPaciente(body: any): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const k of CAMPOS_PACIENTE_PERMITIDOS) {
+    if (body[k] !== undefined) out[k] = body[k];
+  }
+  return out;
+}
 
 // Crear paciente — opcionalmente crea también cuenta de portal
 // Body extra: { crearCuentaPortal?: boolean, passwordPortal?: string }
@@ -63,7 +82,8 @@ export const crearPaciente = async (req: Request, res: Response) => {
       if (existe) return res.status(400).json({ success: false, message: "Ya existe un paciente con ese correo" });
     }
 
-    const paciente = await Paciente.create(req.body);
+    // Whitelist defensiva — NUNCA pasar req.body crudo.
+    const paciente = await Paciente.create(whitelistPaciente(req.body));
 
     // Crear cuenta de portal si fue solicitada
     let credenciales: { correo: string; passwordTemporal: string } | undefined;
@@ -202,9 +222,12 @@ export const buscarPacientePorDni = async (req: Request, res: Response) => {
   }
 };
 
-// Actualizar paciente por ID
+// Actualizar paciente por ID — usa whitelist defensiva.
 export const actualizarPaciente = async (req: Request, res: Response) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, message: "ID inválido" });
+    }
     const error = validarPaciente(req.body, true);
     if (error) return res.status(400).json({ success: false, message: error });
 
@@ -218,13 +241,15 @@ export const actualizarPaciente = async (req: Request, res: Response) => {
       if (existe) return res.status(400).json({ success: false, message: "Ya existe un paciente con ese correo" });
     }
 
+    // Whitelist defensiva — bloquea mass assignment (rol, _id, historiaClinica, etc.).
     const paciente = await Paciente.findByIdAndUpdate(
-      req.params.id, req.body, { new: true, runValidators: true }
+      req.params.id, whitelistPaciente(req.body), { new: true, runValidators: true }
     );
     if (!paciente) return res.status(404).json({ success: false, message: "Paciente no encontrado" });
     res.json({ success: true, message: "Paciente actualizado correctamente", data: paciente });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("actualizarPaciente:", error);
+    res.status(500).json({ success: false, message: "Error al actualizar paciente" });
   }
 };
 
@@ -285,12 +310,38 @@ export const obtenerHistorial = async (req: Request, res: Response) => {
   }
 };
 
-// Actualizar historial clínico
-export const actualizarHistorialClinico = async (req: Request, res: Response) => {
+// Actualizar historial clínico — sólo admin o un médico que haya
+// atendido (o tenga programado atender) al paciente.
+export const actualizarHistorialClinico = async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
-    const { alergias, medicamentosHabituales, problemasMedicos, cirugiasPrevias, antecedentesFamiliares } = req.body;
+    const idRaw = req.params.id;
+    const id = Array.isArray(idRaw) ? idRaw[0] : idRaw;
+    if (!id || !mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "ID inválido" });
+    }
 
+    const rol = String(req.user?.rol ?? "").toUpperCase();
+    const medicoId = req.user?.medicoId;
+
+    // Si es MEDICO, debe haber al menos una cita con ese paciente.
+    if (rol === "MEDICO") {
+      if (!medicoId) {
+        return res.status(403).json({ success: false, message: "Usuario no vinculado a un perfil médico" });
+      }
+      const tieneRelacion = await Cita.exists({
+        pacienteId: new mongoose.Types.ObjectId(id),
+        doctorId: new mongoose.Types.ObjectId(String(medicoId)),
+      });
+      if (!tieneRelacion) {
+        return res.status(403).json({
+          success: false,
+          message: "Sólo puedes editar el historial de pacientes que has atendido",
+        });
+      }
+    }
+    // ADMINISTRADOR pasa sin verificación adicional (cubierto por requireRole en la route).
+
+    const { alergias, medicamentosHabituales, problemasMedicos, cirugiasPrevias, antecedentesFamiliares } = req.body;
     const update: Record<string, any> = {};
     if (alergias !== undefined) update.alergias = alergias;
     if (medicamentosHabituales !== undefined) update.medicamentosHabituales = medicamentosHabituales;
@@ -303,7 +354,8 @@ export const actualizarHistorialClinico = async (req: Request, res: Response) =>
 
     res.json({ success: true, message: "Historial clínico actualizado", data: paciente });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("actualizarHistorialClinico:", error);
+    res.status(500).json({ success: false, message: "Error al actualizar historial" });
   }
 };
 

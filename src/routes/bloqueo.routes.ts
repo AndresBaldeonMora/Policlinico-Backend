@@ -9,16 +9,13 @@ import {
 
 const router = Router();
 
-// POST   /api/bloqueos              — crear bloqueo (requiere RECEPCIONISTA)
-router.post("/", verifyToken, requireRole(["RECEPCIONISTA", "recepcionista", "administrador"]), crearBloqueo);
+router.use(verifyToken);
 
-// GET    /api/bloqueos?doctorId=&mes=&anio=  — listar bloqueos filtrados
-router.get("/", listarBloqueos);
+const STAFF = ["ADMINISTRADOR", "RECEPCIONISTA", "MEDICO"];
 
-// DELETE /api/bloqueos/:id          — desactivar bloqueo (requiere RECEPCIONISTA)
-router.delete("/:id", verifyToken, requireRole(["RECEPCIONISTA", "recepcionista", "administrador"]), desactivarBloqueo);
-
-// GET    /api/bloqueos/doctor/:doctorId/fecha/:fecha  — verificar si un día está bloqueado
-router.get("/doctor/:doctorId/fecha/:fecha", verificarBloqueo);
+router.post("/",                              requireRole(STAFF), crearBloqueo);
+router.get("/",                               requireRole(STAFF), listarBloqueos);
+router.delete("/:id",                         requireRole(STAFF), desactivarBloqueo);
+router.get("/doctor/:doctorId/fecha/:fecha",  requireRole(STAFF), verificarBloqueo);
 
 export default router;

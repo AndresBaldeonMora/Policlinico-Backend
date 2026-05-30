@@ -1,7 +1,12 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 export type PrioridadInterconsulta = "urgente" | "preferente" | "electiva";
-export type EstadoInterconsulta = "PENDIENTE" | "RESPONDIDA" | "CANCELADA";
+export type EstadoInterconsulta =
+  | "PENDIENTE"   // Solicitada, esperando respuesta
+  | "RESPONDIDA"  // Respondida por escrito
+  | "CITADA"      // Se agendó una cita presencial vinculada
+  | "ATENDIDA"    // La cita vinculada fue atendida
+  | "CANCELADA";
 
 export interface IInterconsulta extends Document {
   pacienteId: mongoose.Types.ObjectId;
@@ -21,6 +26,8 @@ export interface IInterconsulta extends Document {
   respondidoPorId?: mongoose.Types.ObjectId;
   respondidoPorNombre?: string;
   fechaRespuesta?: Date;
+  // Cita presencial generada como respuesta (estado CITADA)
+  citaGeneradaId?: mongoose.Types.ObjectId;
 }
 
 const interconsultaSchema = new Schema<IInterconsulta>(
@@ -43,7 +50,7 @@ const interconsultaSchema = new Schema<IInterconsulta>(
     informacionRelevante: { type: String, trim: true, default: "" },
     estado: {
       type: String,
-      enum: ["PENDIENTE", "RESPONDIDA", "CANCELADA"],
+      enum: ["PENDIENTE", "RESPONDIDA", "CITADA", "ATENDIDA", "CANCELADA"],
       default: "PENDIENTE",
       required: true,
     },
@@ -51,6 +58,7 @@ const interconsultaSchema = new Schema<IInterconsulta>(
     respondidoPorId:     { type: Schema.Types.ObjectId, ref: "Doctor" },
     respondidoPorNombre: { type: String, trim: true, default: "" },
     fechaRespuesta:      { type: Date },
+    citaGeneradaId:      { type: Schema.Types.ObjectId, ref: "Cita" },
   },
   { timestamps: true }
 );

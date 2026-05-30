@@ -17,6 +17,18 @@ export const crearBloqueo = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ success: false, message: "doctorId, fecha y motivo son requeridos" });
     }
 
+    // IDOR fix: rol MEDICO sólo puede bloquear SU PROPIA agenda.
+    const rol = String(req.user?.rol ?? "").toUpperCase();
+    if (rol === "MEDICO") {
+      const ownMedicoId = req.user?.medicoId;
+      if (!ownMedicoId || String(ownMedicoId) !== String(doctorId)) {
+        return res.status(403).json({
+          success: false,
+          message: "Sólo puedes crear bloqueos en tu propia agenda",
+        });
+      }
+    }
+
     const doctor = await Doctor.findById(doctorId);
     if (!doctor) {
       return res.status(404).json({ success: false, message: "Doctor no encontrado" });
@@ -107,6 +119,18 @@ export const desactivarBloqueo = async (req: AuthRequest, res: Response) => {
     const bloqueo = await BloqueoHorario.findById(id);
     if (!bloqueo) {
       return res.status(404).json({ success: false, message: "Bloqueo no encontrado" });
+    }
+
+    // IDOR fix: rol MEDICO sólo puede desactivar bloqueos de su propia agenda.
+    const rol = String(req.user?.rol ?? "").toUpperCase();
+    if (rol === "MEDICO") {
+      const ownMedicoId = req.user?.medicoId;
+      if (!ownMedicoId || String(ownMedicoId) !== String(bloqueo.doctorId)) {
+        return res.status(403).json({
+          success: false,
+          message: "Sólo puedes desactivar bloqueos de tu propia agenda",
+        });
+      }
     }
 
     if (!bloqueo.activo) {

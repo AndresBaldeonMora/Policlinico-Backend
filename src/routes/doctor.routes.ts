@@ -8,19 +8,23 @@ import {
   obtenerDoctoresPorEspecialidad,
   obtenerHorariosDisponibles,
 } from "../controllers/doctor.controller";
+import { verifyToken, requireRole } from "../middlewares/authMiddlewares";
 
 const router = Router();
 
-router.get("/",                                       listarDoctores);
-router.post("/",                                      crearDoctor);
+// Todas las rutas de doctores requieren autenticación.
+// (Pacientes que necesiten ver doctores ya están autenticados al reservar.)
+router.use(verifyToken);
 
-// ⚠️ Rutas estáticas ANTES que las dinámicas (:id)
-router.get("/especialidad/:especialidadId",            obtenerDoctoresPorEspecialidad);
+// Lectura: cualquier rol autenticado puede listar/ver doctores.
+router.get("/",                              listarDoctores);
+router.get("/especialidad/:especialidadId",  obtenerDoctoresPorEspecialidad);
+router.get("/:id",                           obtenerDoctor);
+router.get("/:id/horarios-disponibles",      obtenerHorariosDisponibles);
 
-// Rutas dinámicas después
-router.get("/:id",                                    obtenerDoctor);
-router.patch("/:id",                                    actualizarDoctor);
-router.delete("/:id",                                 eliminarDoctor);
-router.get("/:id/horarios-disponibles",               obtenerHorariosDisponibles);
+// Escritura: sólo ADMINISTRADOR.
+router.post("/",      requireRole(["ADMINISTRADOR"]), crearDoctor);
+router.patch("/:id",  requireRole(["ADMINISTRADOR"]), actualizarDoctor);
+router.delete("/:id", requireRole(["ADMINISTRADOR"]), eliminarDoctor);
 
 export default router;
