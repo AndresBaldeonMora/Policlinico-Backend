@@ -7,6 +7,7 @@ import {
   obtenerDetalleCita,
   guardarNotasClinicas,
   prescribirMedicamentos,
+  generarReceta,
   obtenerHistorialCitasPaciente,
   obtenerResultadosRecientes,
 } from "../controllers/medico.controller";
@@ -31,6 +32,9 @@ router.get("/citas/:id", obtenerDetalleCita);
 router.patch("/citas/:id/estado", actualizarEstadoCita);
 router.patch("/citas/:id/notas", guardarNotasClinicas);
 router.patch("/citas/:id/medicamentos", prescribirMedicamentos);
+
+// Receta Única Estandarizada en PDF (descarga/impresión)
+router.get("/citas/:id/receta", generarReceta);
 
 // Historial de citas de un paciente (acceso completo, todas las especialidades)
 router.get("/pacientes/:pacienteId/historial-citas", obtenerHistorialCitasPaciente);

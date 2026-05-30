@@ -59,14 +59,21 @@ export interface ICita extends Document {
   horarioAsistencia?: Date;    // Timestamp de confirmación de asistencia
   motivoCancelacion?: string;  // Por qué se canceló
 
-  // Medicamentos prescritos
+  // Medicamentos prescritos — alineado a la Receta Única Estandarizada (DIGEMID,
+  // NTS 057-MINSA/DIGEMID y DS 014-2011-SA). El DCI (Denominación Común
+  // Internacional / principio activo) es obligatorio en la prescripción peruana.
   medicamentosPrescritos?: {
-    medicamentoId: mongoose.Types.ObjectId;
-    nombre: string;
-    dosis: string;
-    frecuencia: string;
-    duracion: string;
-    observaciones?: string;
+    medicamentoId?: mongoose.Types.ObjectId;
+    nombre: string;              // Nombre del medicamento (marca o genérico)
+    dci?: string;                // Denominación Común Internacional (principio activo)
+    concentracion?: string;      // p. ej. "850 mg", "500 mg/5 mL"
+    formaFarmaceutica?: string;  // Tableta, cápsula, jarabe, inyectable…
+    viaAdministracion?: string;  // Oral, intramuscular, tópica…
+    dosis?: string;              // Cantidad por toma
+    frecuencia?: string;         // Cada 8 h, 2 veces/día…
+    duracion?: string;           // 7 días, 30 días, indefinido…
+    cantidad?: string;           // Cantidad total a dispensar en farmacia
+    observaciones?: string;      // Indicaciones al paciente
   }[];
 
   // Preparado para pagos (NO obligatorio por ahora)
@@ -174,14 +181,19 @@ const citaSchema = new Schema<ICita>(
     horarioAsistencia: { type: Date, required: false },
     motivoCancelacion: { type: String, required: false },
 
-    // Medicamentos prescritos
+    // Medicamentos prescritos (Receta Única Estandarizada — DIGEMID / NTS 057)
     medicamentosPrescritos: [{
-      medicamentoId: { type: Schema.Types.ObjectId, ref: "Medicamento" },
-      nombre:        { type: String, required: true },
-      dosis:         { type: String, required: true },
-      frecuencia:    { type: String, required: true },
-      duracion:      { type: String, required: true },
-      observaciones: { type: String, default: "" },
+      medicamentoId:     { type: Schema.Types.ObjectId, ref: "Medicamento" },
+      nombre:            { type: String, required: true },
+      dci:               { type: String, default: "" },
+      concentracion:     { type: String, default: "" },
+      formaFarmaceutica: { type: String, default: "" },
+      viaAdministracion: { type: String, default: "" },
+      dosis:             { type: String, default: "" },
+      frecuencia:        { type: String, default: "" },
+      duracion:          { type: String, default: "" },
+      cantidad:          { type: String, default: "" },
+      observaciones:     { type: String, default: "" },
     }],
 
     pago: {
