@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { Cita, ICita } from "../models/Cita";
 import { Doctor } from "../models/Doctor";
 import { OrdenExamen } from "../models/OrdenExamen";
+import { Interconsulta } from "../models/Interconsulta";
 import { AuthRequest } from "../middlewares/authMiddlewares";
 import { generarPDFReceta } from "../config/pdfReceta";
 import { enviarCorreoReceta } from "../config/mailer";
@@ -121,23 +122,59 @@ export const obtenerCitasHoy = async (req: Request, res: Response) => {
   }
 };
 
+// Estados terminales: una vez firmada (ATENDIDA), la cita es inmutable (NTS-022 Art. 8).
+const ESTADOS_INMUTABLES = ["ATENDIDA", "CANCELADA"] as const;
+
+// Transiciones permitidas para el portal médico.
+const TRANSICIONES_VALIDAS: Record<string, string[]> = {
+  PENDIENTE: ["ATENDIDA", "CANCELADA"],
+  ASISTIO:   ["ATENDIDA", "CANCELADA"],
+  // ATENDIDA y CANCELADA → nada (terminales)
+};
+
 export const actualizarEstadoCita = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { estado } = req.body;
 
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "ID de cita inválido" });
+    }
     if (!["PENDIENTE", "ATENDIDA", "CANCELADA"].includes(estado)) {
       return res.status(400).json({ success: false, message: "Estado inválido" });
     }
 
+    const doctorId = getDoctorId(req);
+    if (!doctorId) {
+      return res.status(403).json({ success: false, message: "Usuario no vinculado a un perfil médico" });
+    }
+
+    // IDOR fix: filtrar por doctorId — sólo el médico dueño de la cita la modifica.
+    const citaActual = await Cita.findOne({ _id: id, doctorId });
+    if (!citaActual) {
+      return res.status(404).json({ success: false, message: "Cita no encontrada" });
+    }
+
+    // Estado actual terminal → bloquear cambios.
+    if (ESTADOS_INMUTABLES.includes(citaActual.estado as any)) {
+      return res.status(409).json({
+        success: false,
+        message: `La cita está en estado ${citaActual.estado} y no puede modificarse.`,
+      });
+    }
+
+    const transicionesOK = TRANSICIONES_VALIDAS[citaActual.estado] ?? [];
+    if (!transicionesOK.includes(estado)) {
+      return res.status(409).json({
+        success: false,
+        message: `Transición inválida: ${citaActual.estado} → ${estado}`,
+      });
+    }
+
     const update: any = { estado };
 
-    // Al finalizar (ATENDIDA) se estampa la firma electrónica del médico (NTS-022 Art. 8)
+    // Al finalizar (ATENDIDA) se estampa la firma electrónica del médico (NTS-022 Art. 8).
     if (estado === "ATENDIDA") {
-      const doctorId = getDoctorId(req);
-      if (!doctorId) {
-        return res.status(403).json({ success: false, message: "Usuario no vinculado a un perfil médico" });
-      }
       const doctor = await Doctor.findById(doctorId);
       if (!doctor) {
         return res.status(404).json({ success: false, message: "Perfil de médico no encontrado" });
@@ -150,19 +187,28 @@ export const actualizarEstadoCita = async (req: Request, res: Response) => {
       };
     }
 
-    const cita = await Cita.findByIdAndUpdate(
-      id,
-      update,
-      { new: true }
-    ).populate("pacienteId", "nombres apellidos dni telefono");
+    const cita = await Cita.findByIdAndUpdate(id, update, { new: true })
+      .populate("pacienteId", "nombres apellidos dni telefono");
 
     if (!cita) {
       return res.status(404).json({ success: false, message: "Cita no encontrada" });
     }
 
+    if (estado === "ATENDIDA" && (cita as any).interconsultaId) {
+      try {
+        await Interconsulta.findByIdAndUpdate(
+          (cita as any).interconsultaId,
+          { estado: "ATENDIDA" }
+        );
+      } catch (err) {
+        console.error("No se pudo sincronizar interconsulta vinculada:", err);
+      }
+    }
+
     res.json({ success: true, data: cita });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("actualizarEstadoCita:", error);
+    res.status(500).json({ success: false, message: "Error al actualizar la cita" });
   }
 };
 
@@ -171,8 +217,28 @@ export const prescribirMedicamentos = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { medicamentos } = req.body;
 
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "ID de cita inválido" });
+    }
     if (!Array.isArray(medicamentos)) {
       return res.status(400).json({ success: false, message: "medicamentos debe ser un array" });
+    }
+
+    const doctorId = getDoctorId(req);
+    if (!doctorId) {
+      return res.status(403).json({ success: false, message: "No autorizado" });
+    }
+
+    // IDOR fix + bloquear edición de cita firmada.
+    const citaActual = await Cita.findOne({ _id: id, doctorId });
+    if (!citaActual) {
+      return res.status(404).json({ success: false, message: "Cita no encontrada" });
+    }
+    if (ESTADOS_INMUTABLES.includes(citaActual.estado as any)) {
+      return res.status(409).json({
+        success: false,
+        message: `La cita está ${citaActual.estado} y no puede modificarse.`,
+      });
     }
 
     const cita = await Cita.findByIdAndUpdate(
@@ -181,11 +247,10 @@ export const prescribirMedicamentos = async (req: Request, res: Response) => {
       { new: true }
     ).populate("pacienteId", "nombres apellidos dni telefono");
 
-    if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
-
     res.json({ success: true, data: cita });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("prescribirMedicamentos:", error);
+    res.status(500).json({ success: false, message: "Error al guardar prescripción" });
   }
 };
 
@@ -201,34 +266,80 @@ export const guardarNotasClinicas = async (req: Request, res: Response) => {
       update.medicamentosPrescritos = medicamentosPrescritos;
     }
 
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "ID de cita inválido" });
+    }
+
+    const doctorId = getDoctorId(req);
+    if (!doctorId) {
+      return res.status(403).json({ success: false, message: "No autorizado" });
+    }
+
+    // IDOR fix + bloquear edición de cita firmada.
+    const citaActual = await Cita.findOne({ _id: id, doctorId });
+    if (!citaActual) {
+      return res.status(404).json({ success: false, message: "Cita no encontrada" });
+    }
+    if (ESTADOS_INMUTABLES.includes(citaActual.estado as any)) {
+      return res.status(409).json({
+        success: false,
+        message: `La cita está ${citaActual.estado} y no puede modificarse.`,
+      });
+    }
+
     const cita = await Cita.findByIdAndUpdate(
       id,
       update,
       { new: true }
     ).populate("pacienteId", "nombres apellidos dni telefono");
 
-    if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
-
     res.json({ success: true, data: cita });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("guardarNotasClinicas:", error);
+    res.status(500).json({ success: false, message: "Error al guardar la nota clínica" });
   }
 };
 
+// IDOR fix: el médico sólo accede a sus propias citas (o a las de su especialidad si compañero).
 export const obtenerDetalleCita = async (req: Request, res: Response) => {
   try {
-    const cita = await Cita.findById(req.params.id).populate(
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "ID inválido" });
+    }
+
+    const doctorId = getDoctorId(req);
+    if (!doctorId) {
+      return res.status(403).json({ success: false, message: "Usuario no vinculado a un perfil médico" });
+    }
+
+    // Lee primero sin populate de PII para chequear ownership.
+    const citaRef = await Cita.findById(id).select("doctorId pacienteId").lean();
+    if (!citaRef) {
+      return res.status(404).json({ success: false, message: "Cita no encontrada" });
+    }
+
+    // Permitido si: es el doctor de la cita, o es de su misma especialidad.
+    const esDueño = String(citaRef.doctorId) === String(doctorId);
+    let permitido = esDueño;
+    if (!permitido) {
+      const doctoresEspec = await getDoctorIdsEspecialidad(String(doctorId));
+      permitido = doctoresEspec.some((d) => String(d) === String(citaRef.doctorId));
+    }
+    if (!permitido) {
+      return res.status(403).json({ success: false, message: "No tienes acceso a esta cita" });
+    }
+
+    const cita = await Cita.findById(id).populate(
       "pacienteId",
       "nombres apellidos dni telefono correo direccion fechaNacimiento alergias medicamentosHabituales problemasMedicos cirugiasPrevias antecedentesFamiliares"
     );
-
     if (!cita) {
       return res.status(404).json({ success: false, message: "Cita no encontrada" });
     }
 
     const data: any = cita.toObject();
 
-    // Calcular subtipoCita (NTS-022: primera consulta vs. seguimiento por especialidad)
     if (cita.tipo !== "LABORATORIO" && cita.doctorId) {
       const doctorIdsEspec = await getDoctorIdsEspecialidad(String(cita.doctorId));
       if (doctorIdsEspec.length > 0) {
@@ -244,7 +355,8 @@ export const obtenerDetalleCita = async (req: Request, res: Response) => {
 
     res.json({ success: true, data });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("obtenerDetalleCita:", error);
+    res.status(500).json({ success: false, message: "Error al obtener la cita" });
   }
 };
 
@@ -348,11 +460,35 @@ export const generarReceta = async (req: Request, res: Response) => {
 
 export const obtenerHistorialCitasPaciente = async (req: Request, res: Response) => {
   try {
-    const { pacienteId } = req.params;
+    const pacienteIdRaw = req.params.pacienteId;
+    const pacienteId = Array.isArray(pacienteIdRaw) ? pacienteIdRaw[0] : pacienteIdRaw;
     const { excluirCitaId } = req.query;
 
+    if (!pacienteId || !mongoose.isValidObjectId(pacienteId)) {
+      return res.status(400).json({ success: false, message: "ID de paciente inválido" });
+    }
+
+    const doctorId = getDoctorId(req);
+    if (!doctorId) {
+      return res.status(403).json({ success: false, message: "No autorizado" });
+    }
+
+    const doctoresEspec = await getDoctorIdsEspecialidad(String(doctorId));
+    const tieneRelacion = await Cita.exists({
+      pacienteId: new mongoose.Types.ObjectId(pacienteId),
+      doctorId: { $in: doctoresEspec.length ? doctoresEspec : [new mongoose.Types.ObjectId(doctorId)] },
+    });
+    if (!tieneRelacion) {
+      return res.status(403).json({
+        success: false,
+        message: "No tienes acceso al historial de este paciente",
+      });
+    }
+
     const query: any = { pacienteId };
-    if (excluirCitaId) query._id = { $ne: excluirCitaId };
+    if (excluirCitaId && mongoose.isValidObjectId(String(excluirCitaId))) {
+      query._id = { $ne: excluirCitaId };
+    }
 
     const citas = await Cita.find(query)
       .populate({
@@ -365,6 +501,7 @@ export const obtenerHistorialCitasPaciente = async (req: Request, res: Response)
 
     res.json({ success: true, data: citas });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("obtenerHistorialCitasPaciente:", error);
+    res.status(500).json({ success: false, message: "Error al obtener historial" });
   }
 };

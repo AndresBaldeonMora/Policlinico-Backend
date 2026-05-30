@@ -1,7 +1,19 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "secret";
+// Fail-fast: si la env var no está, abortar el arranque en producción.
+// En dev se permite un fallback explícito por DX, advirtiendo en consola.
+const JWT_SECRET = (() => {
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("JWT_SECRET no está configurado en el entorno (producción)");
+  }
+  console.warn("⚠️  JWT_SECRET no definido — usando fallback de DESARROLLO. NUNCA usar en producción.");
+  return "dev-only-jwt-secret-do-not-use-in-production";
+})();
+
+// Exportado para que auth.controller use exactamente el mismo secreto.
+export const getJwtSecret = () => JWT_SECRET;
 
 export interface AuthRequest extends Request {
   user?: any;
@@ -9,6 +21,7 @@ export interface AuthRequest extends Request {
 }
 
 // Verifica el JWT propio del backend (firmado con JWT_SECRET).
+// Fija el algoritmo a HS256 para evitar el ataque "alg: none".
 export const verifyToken = (
   req: AuthRequest,
   res: Response,
@@ -22,7 +35,7 @@ export const verifyToken = (
   const token = authHeader.split(" ")[1];
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"] });
     req.user = decoded;
     return next();
   } catch {

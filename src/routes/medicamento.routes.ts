@@ -9,7 +9,7 @@ import { verifyToken, requireRole } from "../middlewares/authMiddlewares";
 
 const router = express.Router();
 
-router.get("/", listarMedicamentos);
+router.get("/", verifyToken, listarMedicamentos);
 // El catálogo lo gestiona el ADMINISTRADOR; el MEDICO puede dar de alta uno rápido.
 router.post("/", verifyToken, requireRole(["MEDICO", "ADMINISTRADOR"]), crearMedicamento);
 router.patch("/:id", verifyToken, requireRole(["ADMINISTRADOR"]), actualizarMedicamento);

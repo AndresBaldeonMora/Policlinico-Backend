@@ -13,7 +13,7 @@ const validarNombre = (nombre: string): string | null => {
 const mapEspecialidad = (e: any) => ({
   id: e._id.toString(),
   nombre: e.nombre,
-  tieneLaboratorioImagenImagen: e.tieneLaboratorioImagenImagen,
+  tieneLaboratorioImagen: e.tieneLaboratorioImagen,
   examenes: (e.examenes ?? []).map((ex: any) =>
     ex._id ? { _id: ex._id.toString(), nombre: ex.nombre, tipo: ex.tipo } : ex.toString()
   ),

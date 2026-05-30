@@ -1,9 +1,22 @@
 import { Request, Response } from "express";
+import mongoose from "mongoose";
 import { Cita } from "../models/Cita";
 import { Paciente } from "../models/Paciente";
 import { Doctor } from "../models/Doctor";
 import { BloqueoHorario } from "../models/BloqueoHorario";
+import { Interconsulta } from "../models/Interconsulta";
 import { verificarCitasVencidas } from "../jobs/vencimientoCitas";
+
+// Si la cita está vinculada a una interconsulta y pasó a ATENDIDA,
+// avanza la interconsulta también a ATENDIDA. Falla silencioso.
+async function sincronizarInterconsultaAtendida(cita: any) {
+  try {
+    if (!cita?.interconsultaId || cita.estado !== "ATENDIDA") return;
+    await Interconsulta.findByIdAndUpdate(cita.interconsultaId, { estado: "ATENDIDA" });
+  } catch (err) {
+    console.error("No se pudo sincronizar interconsulta vinculada:", err);
+  }
+}
 
 // ✅ Crea fecha en UTC puro para evitar desfase de zona horaria
 const crearFechaUTC = (fechaString: string): Date => {
@@ -11,9 +24,19 @@ const crearFechaUTC = (fechaString: string): Date => {
   return new Date(Date.UTC(year, month - 1, day));
 };
 
-export const crearCita = async (req: Request, res: Response) => {
+export const crearCita = async (req: any, res: Response) => {
   try {
-    const { pacienteId, doctorId, fecha, hora } = req.body;
+    let { pacienteId } = req.body;
+    const { doctorId, fecha, hora } = req.body;
+
+    // PACIENTE: forzar pacienteId al del token (no acepta IDs externos).
+    const rol = String(req.user?.rol ?? "").toUpperCase();
+    if (rol === "PACIENTE") {
+      if (!req.user?.pacienteId) {
+        return res.status(403).json({ success: false, message: "Token sin paciente vinculado" });
+      }
+      pacienteId = String(req.user.pacienteId);
+    }
 
     if (!pacienteId || !doctorId || !fecha || !hora) {
       return res.status(400).json({ success: false, message: "Todos los campos son requeridos" });
@@ -109,11 +132,30 @@ export const reprogramarCita = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { fecha, hora } = req.body;
 
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "ID inválido" });
+    }
+
     const cita = await Cita.findById(id);
     if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
 
-    // Regla de negocio: solo se puede reprogramar hasta 24h antes de la cita.
-    // `hora` es hora local de Perú (UTC-5); `fecha` es medianoche UTC del día.
+    // Estados terminales no pueden reprogramarse (rompería inmutabilidad NTS-022).
+    if (cita.estado === "ATENDIDA" || cita.estado === "CANCELADA") {
+      return res.status(409).json({
+        success: false,
+        message: `No se puede reprogramar una cita ${cita.estado}.`,
+      });
+    }
+
+    // Sólo PENDIENTE o REPROGRAMADA admiten reprogramación.
+    if (cita.estado !== "PENDIENTE" && cita.estado !== "REPROGRAMADA") {
+      return res.status(409).json({
+        success: false,
+        message: `La cita en estado ${cita.estado} no admite reprogramación.`,
+      });
+    }
+
+    // Regla de negocio: 24h mínimo antes de la cita.
     const [horaActual, minActual] = (cita.hora ?? "23:59").split(":").map(Number);
     const momentoCita = new Date(cita.fecha);
     momentoCita.setUTCHours(horaActual + 5, minActual, 0, 0);
@@ -121,7 +163,7 @@ export const reprogramarCita = async (req: Request, res: Response) => {
     if (horasRestantes < 24) {
       return res.status(400).json({
         success: false,
-        message: "No se puede reprogramar: la cita debe reprogramarse con al menos 24 horas de anticipación.",
+        message: "No se puede reprogramar: debe reprogramarse con al menos 24 horas de anticipación.",
       });
     }
 
@@ -130,15 +172,29 @@ export const reprogramarCita = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: "Formato de nueva fecha inválido" });
     }
 
+    // Conflicto: excluye canceladas/vencidas + la propia cita.
     const citaExistente = await Cita.findOne({
       _id: { $ne: id },
       doctorId: cita.doctorId,
       fecha: fechaUTC,
       hora,
+      estado: { $nin: ["CANCELADA", "VENCIDA"] },
     });
-
     if (citaExistente) {
-      return res.status(400).json({ success: false, message: "Ya existe una cita para ese horario" });
+      return res.status(409).json({ success: false, message: "Ya existe una cita para ese horario" });
+    }
+
+    // Verifica bloqueos del doctor en la nueva fecha.
+    const bloqueo = await BloqueoHorario.findOne({
+      doctorId: cita.doctorId,
+      fecha: fechaUTC,
+      activo: true,
+    });
+    if (bloqueo) {
+      return res.status(409).json({
+        success: false,
+        message: "El médico tiene un bloqueo de agenda en esa fecha",
+      });
     }
 
     cita.fecha  = fechaUTC;
@@ -148,7 +204,8 @@ export const reprogramarCita = async (req: Request, res: Response) => {
 
     res.json({ success: true, data: cita, message: "Cita reprogramada exitosamente" });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: "Error al reprogramar cita", error: error.message });
+    console.error("reprogramarCita:", error);
+    res.status(500).json({ success: false, message: "Error al reprogramar cita" });
   }
 };
 
@@ -225,16 +282,41 @@ export const obtenerCitaPorId = async (req: Request, res: Response) => {
   }
 };
 
-export const cancelarCita = async (req: Request, res: Response) => {
+// Transiciones permitidas para las citas (recepción/médico).
+// Estados terminales: ATENDIDA, CANCELADA.
+const CITA_TRANSICIONES: Record<string, string[]> = {
+  PENDIENTE:    ["ASISTIO", "ATENDIDA", "CANCELADA", "REPROGRAMADA"],
+  REPROGRAMADA: ["ASISTIO", "ATENDIDA", "CANCELADA", "PENDIENTE"],
+  ASISTIO:      ["ATENDIDA", "CANCELADA"],
+  // ATENDIDA / CANCELADA → terminales (no se permiten más mutaciones)
+};
+
+export const cancelarCita = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
     const { motivoCancelacion } = req.body;
 
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "ID inválido" });
+    }
+
     const cita = await Cita.findById(id);
     if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
 
+    // Ownership por rol
+    const rol = String(req.user?.rol ?? "").toUpperCase();
+    if (rol === "PACIENTE" && String(cita.pacienteId) !== String(req.user?.pacienteId)) {
+      return res.status(403).json({ success: false, message: "Sólo puedes cancelar tus propias citas" });
+    }
+    if (rol === "MEDICO" && String(cita.doctorId) !== String(req.user?.medicoId)) {
+      return res.status(403).json({ success: false, message: "Sólo puedes cancelar tus propias citas" });
+    }
+
     if (cita.estado === "CANCELADA") {
       return res.status(400).json({ success: false, message: "La cita ya está cancelada" });
+    }
+    if (cita.estado === "ATENDIDA") {
+      return res.status(409).json({ success: false, message: "No se puede cancelar una cita ya atendida" });
     }
 
     cita.estado = "CANCELADA";
@@ -243,14 +325,19 @@ export const cancelarCita = async (req: Request, res: Response) => {
 
     res.json({ success: true, data: cita, message: "Cita cancelada correctamente" });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: "Error al cancelar la cita", error: error.message });
+    console.error("cancelarCita:", error);
+    res.status(500).json({ success: false, message: "Error al cancelar la cita" });
   }
 };
 
-// marcarAsistencia — ahora pone ASISTIO, no ATENDIDA
+// marcarAsistencia — pone ASISTIO (no ATENDIDA).
 export const marcarAsistencia = async (req: Request, res: Response) => {
   try {
-    const cita = await Cita.findById(req.params.id);
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "ID inválido" });
+    }
+    const cita = await Cita.findById(id);
     if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
 
     if (cita.estado !== "PENDIENTE" && cita.estado !== "REPROGRAMADA") {
@@ -263,15 +350,20 @@ export const marcarAsistencia = async (req: Request, res: Response) => {
 
     res.json({ success: true, data: cita, message: "Asistencia marcada correctamente" });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: "Error al marcar asistencia", error: error.message });
+    console.error("marcarAsistencia:", error);
+    res.status(500).json({ success: false, message: "Error al marcar asistencia" });
   }
 };
 
-// cambiarEstado — nuevo endpoint para ATENDIDA/CANCELADA desde detalle
+// cambiarEstado — endpoint genérico, valida transiciones.
 export const cambiarEstado = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { estado } = req.body;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "ID inválido" });
+    }
 
     const estadosValidos = ["PENDIENTE", "ASISTIO", "ATENDIDA", "CANCELADA", "REPROGRAMADA"];
     if (!estadosValidos.includes(estado)) {
@@ -281,12 +373,31 @@ export const cambiarEstado = async (req: Request, res: Response) => {
     const cita = await Cita.findById(id);
     if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
 
+    // Estados terminales no se pueden mutar.
+    if (cita.estado === "ATENDIDA" || cita.estado === "CANCELADA") {
+      return res.status(409).json({
+        success: false,
+        message: `Cita en estado ${cita.estado}: no se admiten cambios.`,
+      });
+    }
+
+    const transicionesOK = CITA_TRANSICIONES[cita.estado] ?? [];
+    if (estado !== cita.estado && !transicionesOK.includes(estado)) {
+      return res.status(409).json({
+        success: false,
+        message: `Transición inválida: ${cita.estado} → ${estado}`,
+      });
+    }
+
     cita.estado = estado;
     await cita.save();
 
+    await sincronizarInterconsultaAtendida(cita);
+
     res.json({ success: true, data: cita, message: "Estado actualizado" });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: "Error al cambiar estado", error: error.message });
+    console.error("cambiarEstado:", error);
+    res.status(500).json({ success: false, message: "Error al cambiar estado" });
   }
 };
 
@@ -310,8 +421,8 @@ export const cambiarEstado = async (req: Request, res: Response) => {
 
 export const obtenerHistorialCitas = async (req: Request, res: Response) => {
   try {
-    const correo: string | undefined =
-      (req.query.correo as string) || req.body.correo;
+    const correoRaw = (req.query.correo as string) || req.body.correo;
+    const correo = typeof correoRaw === "string" ? correoRaw : "";
 
     if (!correo) {
       return res.status(400).json({
@@ -320,15 +431,37 @@ export const obtenerHistorialCitas = async (req: Request, res: Response) => {
       });
     }
 
-    const paciente = await Paciente.findOne({
-      correo: correo.toLowerCase().trim(),
-    }).lean();
+    // Autorización: el rol PACIENTE sólo puede ver SU propio historial.
+    // El correo del query DEBE coincidir con el del usuario autenticado.
+    const user = (req as any).user;
+    const rol = String(user?.rol ?? "").toUpperCase();
+    const correoNorm = correo.toLowerCase().trim();
+
+    if (rol === "PACIENTE") {
+      const correoUser = String(user?.correo ?? "").toLowerCase().trim();
+      const pacienteIdUser = user?.pacienteId;
+      // Si el token no trae el correo, validamos por pacienteId.
+      if (correoUser && correoUser !== correoNorm) {
+        return res.status(403).json({ success: false, message: "No autorizado a ver historiales ajenos" });
+      }
+      if (!correoUser && !pacienteIdUser) {
+        return res.status(403).json({ success: false, message: "No autorizado" });
+      }
+    }
+    // ADMINISTRADOR / RECEPCIONISTA / MEDICO: permitido (cubierto por requireRole en la route).
+
+    const paciente = await Paciente.findOne({ correo: correoNorm }).lean();
 
     if (!paciente) {
       return res.status(404).json({
         success: false,
         message: "No se encontró un paciente con ese correo",
       });
+    }
+
+    // Defensa extra: si rol es PACIENTE con pacienteId en el token, confirmar match.
+    if (rol === "PACIENTE" && user?.pacienteId && String(paciente._id) !== String(user.pacienteId)) {
+      return res.status(403).json({ success: false, message: "No autorizado" });
     }
 
     const { especialidad, medicoNombre, fechaDesde, fechaHasta } = req.query;
@@ -427,13 +560,51 @@ export const obtenerHistorialCitas = async (req: Request, res: Response) => {
   }
 };
 
+// eliminarCita — hard delete sólo por admin, con audit log + protección a citas atendidas.
 export const eliminarCita = async (req: Request, res: Response) => {
   try {
-    const cita = await Cita.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "ID inválido" });
+    }
+
+    const cita = await Cita.findById(id);
     if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
+
+    // No permitir borrar citas ATENDIDAS (registro clínico inmutable NTS-022).
+    if (cita.estado === "ATENDIDA") {
+      return res.status(409).json({
+        success: false,
+        message: "No se puede eliminar una cita atendida (registro clínico inmutable). Use cancelar.",
+      });
+    }
+
+    const usuario = (req as any).user;
+    const snapshot = cita.toObject();
+
+    await cita.deleteOne();
+
+    // Audit log
+    try {
+      const { AuditLog } = await import("../models/AuditLog");
+      await AuditLog.create({
+        accion: "ELIMINAR_CITA",
+        entidad: "Cita",
+        entidadId: String(id),
+        usuarioId: usuario?.userId ? String(usuario.userId) : undefined,
+        usuarioNombre: usuario ? `${usuario.nombres ?? ""} ${usuario.apellidos ?? ""}`.trim() : undefined,
+        rol: usuario?.rol,
+        timestamp: new Date(),
+        snapshot,
+      });
+    } catch (logErr) {
+      console.error("AuditLog ELIMINAR_CITA falló:", logErr);
+    }
+
     res.json({ success: true, message: "Cita eliminada correctamente" });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: "Error al eliminar la cita", error: error.message });
+    console.error("eliminarCita:", error);
+    res.status(500).json({ success: false, message: "Error al eliminar la cita" });
   }
 };
 

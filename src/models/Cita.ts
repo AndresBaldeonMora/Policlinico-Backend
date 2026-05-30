@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document } from "mongoose";
 
-export type TipoCita = "CONSULTA" | "LABORATORIO" | "REMOTA" | "DOMICILIO";
+export type TipoCita = "CONSULTA" | "LABORATORIO" | "REMOTA" | "DOMICILIO" | "INTERCONSULTA";
 
 export interface ICita extends Document {
   pacienteId: mongoose.Types.ObjectId;
@@ -9,6 +9,9 @@ export interface ICita extends Document {
   hora?: string;
   tipo: TipoCita;
   estado: "PENDIENTE" | "ASISTIO" | "ATENDIDA" | "CANCELADA" | "REPROGRAMADA" | "VENCIDA";
+
+  // Vínculo cuando la cita nace como respuesta presencial a una interconsulta
+  interconsultaId?: mongoose.Types.ObjectId;
 
   // Exclusivos de citas LABORATORIO
   fechaVigenciaHasta?: Date;   // Hasta cuándo es válida la cita de laboratorio
@@ -110,9 +113,15 @@ const citaSchema = new Schema<ICita>(
 
     tipo: {
       type: String,
-      enum: ["CONSULTA", "LABORATORIO", "REMOTA", "DOMICILIO"],
+      enum: ["CONSULTA", "LABORATORIO", "REMOTA", "DOMICILIO", "INTERCONSULTA"],
       default: "CONSULTA",
       required: true,
+    },
+
+    interconsultaId: {
+      type: Schema.Types.ObjectId,
+      ref: "Interconsulta",
+      required: false,
     },
 
     estado: {
@@ -208,5 +217,11 @@ citaSchema.index(
 
 // Índice para reportes de morbilidad por código CIE-10 (NTS-139)
 citaSchema.index({ "diagnosticos.codigo": 1 });
+
+// Performance: historiales y agenda diaria.
+citaSchema.index({ pacienteId: 1, fecha: -1 });
+citaSchema.index({ fecha: 1 });
+citaSchema.index({ estado: 1, fecha: 1 });
+citaSchema.index({ interconsultaId: 1 });
 
 export const Cita = mongoose.model<ICita>("Cita", citaSchema);

@@ -498,6 +498,8 @@ export const finalizarOrden = async (
 
     const ahora = new Date();
     orden.archivoResultadoUrl = uploadResult.secure_url;
+    (orden as any).archivoResultadoPublicId = uploadResult.public_id;
+    (orden as any).archivoResultadoResourceType = "raw";
     orden.fechaResultados = ahora;
     orden.estado = "FINALIZADO";
     // Marcar todos los ítems como completados
@@ -717,7 +719,8 @@ export const listarOrdenesPendientes = async (req: Request, res: Response) => {
 };
 
 // ── Obtener orden por ID ──
-export const obtenerOrden = async (req: Request, res: Response) => {
+// PACIENTE sólo accede a SU propia orden. Médico sólo a las suyas.
+export const obtenerOrden = async (req: any, res: Response) => {
   try {
     const orden = await OrdenExamen.findById(req.params.id)
       .populate("pacienteId", "nombres apellidos dni fechaNacimiento sexo")
@@ -726,17 +729,41 @@ export const obtenerOrden = async (req: Request, res: Response) => {
       .populate("items.examenId", "nombre tipo instrucciones preguntasProtocolares");
     if (!orden)
       return res.status(404).json({ success: false, message: "Orden no encontrada" });
+
+    const rol = String(req.user?.rol ?? "").toUpperCase();
+    const pacienteIdRef = (orden.pacienteId as any)?._id ?? orden.pacienteId;
+    const doctorIdRef = (orden.doctorId as any)?._id ?? orden.doctorId;
+    if (rol === "PACIENTE" && String(pacienteIdRef) !== String(req.user?.pacienteId)) {
+      return res.status(403).json({ success: false, message: "No tienes acceso a esta orden" });
+    }
+    if (rol === "MEDICO" && String(doctorIdRef) !== String(req.user?.medicoId)) {
+      return res.status(403).json({ success: false, message: "No tienes acceso a esta orden" });
+    }
+
     res.json({ success: true, data: orden });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("obtenerOrden:", error);
+    res.status(500).json({ success: false, message: "Error al obtener la orden" });
   }
 };
 
 // ── Listar órdenes por paciente ──
-export const listarOrdenesPorPaciente = async (req: Request, res: Response) => {
+// PACIENTE: sólo sus propias órdenes. MEDICO: las que él ordenó. Staff: todas las del paciente.
+export const listarOrdenesPorPaciente = async (req: any, res: Response) => {
   try {
     const { pacienteId } = req.params;
-    const ordenes = await OrdenExamen.find({ pacienteId })
+    const rol = String(req.user?.rol ?? "").toUpperCase();
+
+    if (rol === "PACIENTE" && String(pacienteId) !== String(req.user?.pacienteId)) {
+      return res.status(403).json({ success: false, message: "No autorizado a ver órdenes de otros pacientes" });
+    }
+
+    const filtro: any = { pacienteId };
+    if (rol === "MEDICO" && req.user?.medicoId) {
+      filtro.doctorId = req.user.medicoId;
+    }
+
+    const ordenes = await OrdenExamen.find(filtro)
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
       .populate("items.examenId", "nombre tipo preguntasProtocolares")
@@ -868,7 +895,8 @@ export const actualizarOrden = async (req: AuthRequest, res: Response) => {
 };
 
 // ── Datos para impresión de orden ──
-export const obtenerOrdenParaImprimir = async (req: Request, res: Response) => {
+// PACIENTE: sólo su propia orden. MEDICO: sólo las que él ordenó.
+export const obtenerOrdenParaImprimir = async (req: any, res: Response) => {
   try {
     const orden = await OrdenExamen.findById(req.params.id)
       .populate("pacienteId", "nombres apellidos dni fechaNacimiento sexo")
@@ -883,6 +911,16 @@ export const obtenerOrdenParaImprimir = async (req: Request, res: Response) => {
     if (!orden)
       return res.status(404).json({ success: false, message: "Orden no encontrada" });
 
+    const rol = String(req.user?.rol ?? "").toUpperCase();
+    const pacienteIdRef = (orden.pacienteId as any)?._id ?? orden.pacienteId;
+    const doctorIdRef = (orden.doctorId as any)?._id ?? orden.doctorId;
+    if (rol === "PACIENTE" && String(pacienteIdRef) !== String(req.user?.pacienteId)) {
+      return res.status(403).json({ success: false, message: "No tienes acceso a esta orden" });
+    }
+    if (rol === "MEDICO" && String(doctorIdRef) !== String(req.user?.medicoId)) {
+      return res.status(403).json({ success: false, message: "No tienes acceso a esta orden" });
+    }
+
     res.json({
       success: true,
       data: {
@@ -895,7 +933,8 @@ export const obtenerOrdenParaImprimir = async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("obtenerOrdenParaImprimir:", error);
+    res.status(500).json({ success: false, message: "Error al obtener la orden" });
   }
 };
 
@@ -1091,5 +1130,66 @@ export const obtenerDisponibilidadImagen = async (req: Request, res: Response) =
   }
 };
 
-// ── Audit logs (diagnóstico) ──
+// ─────────────────────────────────────────────────────────────
+// Descarga firmada de archivos de resultados (anti link-leakage)
+// ─────────────────────────────────────────────────────────────
+// El cliente NO debe consumir directamente `archivoResultadoUrl`
+// (es público y enumerable). En su lugar pide este endpoint, que
+// verifica acceso y devuelve una URL temporal firmada por 5 min.
+export const obtenerUrlResultadoFirmada = async (req: any, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "ID inválido" });
+    }
+
+    const orden = await OrdenExamen.findById(id).select(
+      "pacienteId doctorId archivoResultadoUrl archivoResultadoPublicId archivoResultadoResourceType estado"
+    );
+    if (!orden) return res.status(404).json({ success: false, message: "Orden no encontrada" });
+    if (orden.estado !== "FINALIZADO" || !orden.archivoResultadoUrl) {
+      return res.status(404).json({ success: false, message: "La orden aún no tiene resultados cargados" });
+    }
+
+    // Autorización: paciente dueño / médico de la orden / staff.
+    const rol = String(req.user?.rol ?? "").toUpperCase();
+    const permitidoStaff = rol === "ADMINISTRADOR" || rol === "RECEPCIONISTA";
+    const esPacienteDueño = rol === "PACIENTE" && String(req.user?.pacienteId) === String(orden.pacienteId);
+    const esMedicoDueño = rol === "MEDICO" && String(req.user?.medicoId) === String(orden.doctorId);
+    if (!permitidoStaff && !esPacienteDueño && !esMedicoDueño) {
+      return res.status(403).json({ success: false, message: "No tienes acceso a este resultado" });
+    }
+
+    const publicId = (orden as any).archivoResultadoPublicId as string | undefined;
+    if (!publicId) {
+      // Legacy: subido antes de guardar publicId. Devolvemos la URL existente
+      // pero el cliente debe entender que es pública.
+      return res.json({
+        success: true,
+        url: orden.archivoResultadoUrl,
+        signed: false,
+        expiresAt: null,
+      });
+    }
+
+    const ttl = 5 * 60; // 5 minutos
+    const expiresAt = Math.floor(Date.now() / 1000) + ttl;
+    const signedUrl = cloudinary.utils.private_download_url(publicId, "pdf", {
+      resource_type: ((orden as any).archivoResultadoResourceType || "raw"),
+      expires_at: expiresAt,
+      attachment: false,
+    });
+
+    return res.json({
+      success: true,
+      url: signedUrl,
+      signed: true,
+      expiresAt: new Date(expiresAt * 1000).toISOString(),
+    });
+  } catch (error: any) {
+    console.error("obtenerUrlResultadoFirmada:", error);
+    return res.status(500).json({ success: false, message: "Error al generar URL de descarga" });
+  }
+};
+
 export { };
