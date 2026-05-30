@@ -102,9 +102,8 @@ export const obtenerCitasHoy = async (req: Request, res: Response) => {
     }
 
     const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    const manana = new Date(hoy);
-    manana.setDate(manana.getDate() + 1);
+    hoy.setUTCHours(0, 0, 0, 0);
+    const manana = new Date(hoy.getTime() + 24 * 60 * 60 * 1000);
 
     const [citas, doctorIdsEspec] = await Promise.all([
       Cita.find({ doctorId, fecha: { $gte: hoy, $lt: manana } })
