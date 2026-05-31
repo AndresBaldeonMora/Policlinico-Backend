@@ -1,6 +1,7 @@
 import express from "express";
 import {
   crearPaciente,
+  crearCuentaPaciente,
   listarPacientes,
   obtenerPaciente,
   buscarPacientePorDni,
@@ -23,6 +24,7 @@ const STAFF_PADRON = ["ADMINISTRADOR", "RECEPCIONISTA"];
 const PUEDE_CONSULTAR = ["ADMINISTRADOR", "RECEPCIONISTA", "MEDICO"];
 
 router.post("/",                       requireRole(STAFF_PADRON), crearPaciente);
+router.post("/:id/crear-cuenta",       requireRole(STAFF_PADRON), crearCuentaPaciente);
 router.get("/",                        requireRole(PUEDE_CONSULTAR), listarPacientes);
 router.get("/dni/:dni",                requireRole(PUEDE_CONSULTAR), buscarPacientePorDni);
 router.get("/:id/historial",           requireRole(PUEDE_CONSULTAR), obtenerHistorial);
