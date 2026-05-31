@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import mongoose from "mongoose";
 import { Cita, ICita } from "../models/Cita";
 import { Doctor } from "../models/Doctor";
+import { Horario } from "../models/Horario";
 import { OrdenExamen } from "../models/OrdenExamen";
 import { Interconsulta } from "../models/Interconsulta";
 import { AuthRequest } from "../middlewares/authMiddlewares";
@@ -117,6 +118,32 @@ export const obtenerCitasHoy = async (req: Request, res: Response) => {
 
     const data = await anotarSubtipo(citas, doctorIdsEspec);
     res.json({ success: true, data });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const obtenerTurnoHoy = async (req: Request, res: Response) => {
+  try {
+    const doctorId = getDoctorId(req);
+    if (!doctorId) return res.status(403).json({ success: false, message: "No autorizado" });
+
+    const ahora = new Date();
+    const hoy   = new Date(Date.UTC(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()));
+    const manana = new Date(hoy.getTime() + 24 * 60 * 60 * 1000);
+
+    const slots = await Horario.find({ doctorId, fecha: { $gte: hoy, $lt: manana } })
+      .sort({ hora: 1 })
+      .select("hora -_id");
+
+    if (slots.length === 0) {
+      return res.json({ success: true, data: null });
+    }
+
+    res.json({
+      success: true,
+      data: { inicio: slots[0].hora, fin: slots[slots.length - 1].hora },
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

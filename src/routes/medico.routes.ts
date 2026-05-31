@@ -3,6 +3,7 @@ import {
   obtenerMiPerfil,
   obtenerMisCitas,
   obtenerCitasHoy,
+  obtenerTurnoHoy,
   actualizarEstadoCita,
   obtenerDetalleCita,
   guardarNotasClinicas,
@@ -24,7 +25,8 @@ router.get("/perfil", obtenerMiPerfil);
 
 // Citas
 router.get("/citas", obtenerMisCitas);
-router.get("/citas-hoy", obtenerCitasHoy);
+router.get("/citas-hoy", obtenerCitasHoy)
+router.get("/turno-hoy", obtenerTurnoHoy);
 
 // Resultados de laboratorio/imagen recientemente finalizados (bandeja del dashboard)
 router.get("/resultados-recientes", obtenerResultadosRecientes);

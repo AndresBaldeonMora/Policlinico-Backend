@@ -16,6 +16,7 @@
     "seed:horarios": "ts-node src/config/seedHorarios.ts",
     "seed:cie10": "ts-node src/config/seedCIE10.ts",
     "seed:dia-laboral": "ts-node src/config/seedDiaLaboral.ts",
+    "seed:horario-todos": "ts-node src/config/seedHorarioTodos.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },
