@@ -9,6 +9,7 @@ import {
   guardarNotasClinicas,
   prescribirMedicamentos,
   generarReceta,
+  generarAlta,
   obtenerHistorialCitasPaciente,
   obtenerResultadosRecientes,
 } from "../controllers/medico.controller";
@@ -37,7 +38,7 @@ router.patch("/citas/:id/medicamentos", prescribirMedicamentos);
 
 // Receta Única Estandarizada en PDF (descarga/impresión)
 router.get("/citas/:id/receta", generarReceta);
-
+router.get("/citas/:id/alta", generarAlta);
 // Historial de citas de un paciente (acceso completo, todas las especialidades)
 router.get("/pacientes/:pacienteId/historial-citas", obtenerHistorialCitasPaciente);
 

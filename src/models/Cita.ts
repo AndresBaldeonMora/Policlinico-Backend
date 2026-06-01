@@ -13,6 +13,9 @@ export interface ICita extends Document {
   // Vínculo cuando la cita nace como respuesta presencial a una interconsulta
   interconsultaId?: mongoose.Types.ObjectId;
 
+  altaMedicaUrl?:      string;
+  altaMedicaPublicId?: string;
+
   // Exclusivos de citas LABORATORIO
   fechaVigenciaHasta?: Date;   // Hasta cuándo es válida la cita de laboratorio
   instrucciones?: string;      // Indicaciones compiladas para el paciente
@@ -146,6 +149,9 @@ const citaSchema = new Schema<ICita>(
     notasClinicas:     { type: String, default: "" },
     diagnostico:       { type: String, default: "" },
     tratamiento:       { type: String, default: "" },
+
+    altaMedicaUrl:      { type: String, trim: true },
+    altaMedicaPublicId: { type: String, trim: true },
 
     // Diagnósticos CIE-10 estructurados
     diagnosticos: [{
