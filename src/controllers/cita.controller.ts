@@ -190,10 +190,31 @@ export const reprogramarCita = async (req: Request, res: Response) => {
       });
     }
 
+    const fechaOriginal = new Date(cita.fecha).toLocaleDateString("es-PE");
+    const horaOriginal = cita.hora;
+    const fechaNueva = new Date(fechaUTC).toLocaleDateString("es-PE");
+
     cita.fecha  = fechaUTC;
     cita.hora   = hora;
     cita.estado = "REPROGRAMADA";
     await cita.save();
+
+    // Crear audit log
+    try {
+      const { AuditLog } = await import("../models/AuditLog");
+      const usuario = (req as any).user;
+      await AuditLog.create({
+        accion: "REPROGRAMAR",
+        entidad: "Cita",
+        entidadId: cita._id,
+        usuarioId: usuario?.userId ? new mongoose.Types.ObjectId(usuario.userId) : undefined,
+        usuarioNombre: usuario ? `${usuario.nombres ?? ""} ${usuario.apellidos ?? ""}`.trim() : undefined,
+        descripcion: `Reprogramada de ${fechaOriginal} ${horaOriginal} a ${fechaNueva} ${hora}`,
+        timestamp: new Date(),
+      });
+    } catch (logErr) {
+      console.error("AuditLog REPROGRAMAR falló:", logErr);
+    }
 
     res.json({ success: true, data: cita, message: "Cita reprogramada exitosamente" });
   } catch (error: any) {
@@ -379,8 +400,28 @@ export const cambiarEstado = async (req: Request, res: Response) => {
       });
     }
 
+    const estadoAnterior = cita.estado;
     cita.estado = estado;
     await cita.save();
+
+    // Crear audit log
+    try {
+      const { AuditLog } = await import("../models/AuditLog");
+      const usuario = (req as any).user;
+      await AuditLog.create({
+        accion: "CAMBIO_ESTADO",
+        entidad: "Cita",
+        entidadId: cita._id,
+        usuarioId: usuario?.userId ? new mongoose.Types.ObjectId(usuario.userId) : undefined,
+        usuarioNombre: usuario ? `${usuario.nombres ?? ""} ${usuario.apellidos ?? ""}`.trim() : undefined,
+        estadoAnterior,
+        estadoNuevo: estado,
+        descripcion: `Estado: ${estadoAnterior} → ${estado}`,
+        timestamp: new Date(),
+      });
+    } catch (logErr) {
+      console.error("AuditLog CAMBIO_ESTADO falló:", logErr);
+    }
 
     await sincronizarInterconsultaAtendida(cita);
 
@@ -662,5 +703,96 @@ export const obtenerDetalleCitaHistorial = async (req: Request, res: Response) =
       message: "Error al obtener el detalle de la cita",
       error: error.message,
     });
+  }
+};
+
+export const obtenerAuditoriaCita = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "ID inválido" });
+    }
+
+    const { AuditLog } = await import("../models/AuditLog");
+    const logs = await AuditLog.find({ entidad: "Cita", entidadId: id })
+      .sort({ timestamp: 1 });
+
+    res.json({ success: true, data: logs });
+  } catch (error: any) {
+    console.error("obtenerAuditoriaCita:", error);
+    res.status(500).json({ success: false, message: "Error al obtener auditoría" });
+  }
+};
+
+export const actualizarCita = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { doctorId, notasClinicas } = req.body;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "ID inválido" });
+    }
+
+    const cita = await Cita.findById(id);
+    if (!cita) return res.status(404).json({ success: false, message: "Cita no encontrada" });
+
+    const usuario = (req as any).user;
+    const { AuditLog } = await import("../models/AuditLog");
+
+    // Validar doctorId si se proporciona
+    if (doctorId) {
+      const doctorExiste = await Doctor.exists({ _id: doctorId });
+      if (!doctorExiste) {
+        return res.status(400).json({ success: false, message: "Doctor inválido o no existe" });
+      }
+
+      // Log de cambio de doctor
+      if (String(cita.doctorId || "") !== String(doctorId)) {
+        const doctorAnterior = cita.doctorId ? await Doctor.findById(cita.doctorId).select("nombres apellidos") : null;
+        const doctorNuevo = await Doctor.findById(doctorId).select("nombres apellidos");
+
+        cita.doctorId = doctorId;
+
+        try {
+          await AuditLog.create({
+            accion: "CAMBIO_DOCTOR",
+            entidad: "Cita",
+            entidadId: cita._id,
+            usuarioId: usuario?.userId ? new mongoose.Types.ObjectId(usuario.userId) : undefined,
+            usuarioNombre: usuario ? `${usuario.nombres ?? ""} ${usuario.apellidos ?? ""}`.trim() : undefined,
+            descripcion: `Doctor: ${doctorAnterior ? `${doctorAnterior.nombres} ${doctorAnterior.apellidos}` : "Sin asignar"} → ${doctorNuevo ? `${doctorNuevo.nombres} ${doctorNuevo.apellidos}` : "Sin asignar"}`,
+            timestamp: new Date(),
+          });
+        } catch (logErr) {
+          console.error("AuditLog CAMBIO_DOCTOR falló:", logErr);
+        }
+      }
+    }
+
+    // Log de notas clínicas
+    if (notasClinicas !== undefined && notasClinicas !== cita.notasClinicas) {
+      const notasAnteriores = cita.notasClinicas || "";
+      cita.notasClinicas = notasClinicas;
+
+      try {
+        await AuditLog.create({
+          accion: "ACTUALIZAR_NOTAS",
+          entidad: "Cita",
+          entidadId: cita._id,
+          usuarioId: usuario?.userId ? new mongoose.Types.ObjectId(usuario.userId) : undefined,
+          usuarioNombre: usuario ? `${usuario.nombres ?? ""} ${usuario.apellidos ?? ""}`.trim() : undefined,
+          descripcion: "Notas de la cita actualizadas",
+          timestamp: new Date(),
+        });
+      } catch (logErr) {
+        console.error("AuditLog ACTUALIZAR_NOTAS falló:", logErr);
+      }
+    }
+
+    await cita.save();
+    res.json({ success: true, data: cita, message: "Cita actualizada correctamente" });
+  } catch (error: any) {
+    console.error("actualizarCita:", error);
+    res.status(500).json({ success: false, message: "Error al actualizar la cita" });
   }
 };
