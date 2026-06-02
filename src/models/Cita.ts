@@ -224,4 +224,8 @@ citaSchema.index({ fecha: 1 });
 citaSchema.index({ estado: 1, fecha: 1 });
 citaSchema.index({ interconsultaId: 1 });
 
+// Estados que mantienen un horario OCUPADO. Una cita en cualquier otro
+// estado (CANCELADA, VENCIDA, REPROGRAMADA, ATENDIDA) libera el slot.
+export const ESTADOS_OCUPAN_SLOT = ["PENDIENTE", "ASISTIO"];
+
 export const Cita = mongoose.model<ICita>("Cita", citaSchema);

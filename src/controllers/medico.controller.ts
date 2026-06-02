@@ -8,6 +8,7 @@ import { Interconsulta } from "../models/Interconsulta";
 import { AuthRequest } from "../middlewares/authMiddlewares";
 import { generarPDFReceta } from "../config/pdfReceta";
 import { enviarCorreoReceta } from "../config/mailer";
+import { hoyPeruUTC } from "../utils/fecha.utils";
 
 const getDoctorId = (req: Request): string | null => {
   const user = (req as AuthRequest).user;
@@ -105,8 +106,7 @@ export const obtenerCitasHoy = async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, message: "No autorizado" });
     }
 
-    const hoy = new Date();
-    hoy.setUTCHours(0, 0, 0, 0);
+    const hoy = hoyPeruUTC();
     const manana = new Date(hoy.getTime() + 24 * 60 * 60 * 1000);
 
     const [citas, doctorIdsEspec] = await Promise.all([
@@ -128,8 +128,7 @@ export const obtenerTurnoHoy = async (req: Request, res: Response) => {
     const doctorId = getDoctorId(req);
     if (!doctorId) return res.status(403).json({ success: false, message: "No autorizado" });
 
-    const ahora = new Date();
-    const hoy   = new Date(Date.UTC(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()));
+    const hoy   = hoyPeruUTC();
     const manana = new Date(hoy.getTime() + 24 * 60 * 60 * 1000);
 
     const slots = await Horario.find({ doctorId, fecha: { $gte: hoy, $lt: manana } })

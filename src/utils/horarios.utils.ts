@@ -23,6 +23,8 @@ export class HorariosUtil {
   }
 
   static obtenerDiaSemana(fecha: string): number {
-    return new Date(fecha).getDay();
+    // getUTCDay: la fecha se guarda como medianoche UTC; getDay() local
+    // devolvería el día anterior en servidores al oeste de UTC.
+    return new Date(fecha).getUTCDay();
   }
 }

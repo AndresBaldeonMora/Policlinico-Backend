@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from "mongoose";
+import { hoyPeruUTC } from "../utils/fecha.utils";
 
 export interface IRespuestaProtocolar {
   preguntaId: string;
@@ -104,7 +105,9 @@ const ordenExamenSchema = new Schema<IOrdenExamen>(
       enum: ["LABORATORIO", "IMAGEN", "MIXTA"],
       default: "LABORATORIO",
     },
-    fecha:          { type: Date, required: true, default: () => new Date() },
+    // Día de la orden = fecha del calendario peruano como medianoche UTC.
+    // Debe coincidir con el rango que usa generarCodigoOrden para el secuencial.
+    fecha:          { type: Date, required: true, default: () => hoyPeruUTC() },
     // Ciclo de vida
     fechaAutorizacion:  { type: Date },
     fechaCitaLab:       { type: Date },

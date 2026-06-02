@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { AuditLog } from "../models/AuditLog";
 import { AuthRequest } from "../middlewares/authMiddlewares";
+import { finDelDiaUTC } from "../utils/fecha.utils";
 
 // ─────────────────────────────────────────────────────────────
 // VISOR DE AUDITORÍA  (solo ADMINISTRADOR)
@@ -31,10 +32,8 @@ export const listarAuditoria = async (req: AuthRequest, res: Response) => {
       const rango: Record<string, Date> = {};
       if (desde) rango.$gte = new Date(String(desde));
       if (hasta) {
-        // incluir todo el día "hasta"
-        const fin = new Date(String(hasta));
-        fin.setHours(23, 59, 59, 999);
-        rango.$lte = fin;
+        // incluir todo el día "hasta" (fin de día en UTC)
+        rango.$lte = finDelDiaUTC(new Date(String(hasta)));
       }
       filtro.timestamp = rango;
     }

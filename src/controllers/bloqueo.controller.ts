@@ -3,11 +3,7 @@ import { BloqueoHorario } from "../models/BloqueoHorario";
 import { Doctor } from "../models/Doctor";
 import { AuditLog } from "../models/AuditLog";
 import { AuthRequest } from "../middlewares/authMiddlewares";
-
-const crearFechaUTC = (fechaString: string): Date => {
-  const [year, month, day] = fechaString.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day));
-};
+import { crearFechaUTC } from "../utils/fecha.utils";
 
 export const crearBloqueo = async (req: AuthRequest, res: Response) => {
   try {

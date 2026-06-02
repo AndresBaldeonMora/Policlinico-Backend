@@ -1,11 +1,12 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
-import { Cita } from "../models/Cita";
+import { Cita, ESTADOS_OCUPAN_SLOT } from "../models/Cita";
 import { Paciente } from "../models/Paciente";
 import { Doctor } from "../models/Doctor";
 import { BloqueoHorario } from "../models/BloqueoHorario";
 import { Interconsulta } from "../models/Interconsulta";
 import { verificarCitasVencidas } from "../jobs/vencimientoCitas";
+import { crearFechaUTC, hoyPeruUTC, horaPeruAInstanteUTC } from "../utils/fecha.utils";
 
 // Si la cita está vinculada a una interconsulta y pasó a ATENDIDA,
 // avanza la interconsulta también a ATENDIDA. Falla silencioso.
@@ -17,12 +18,6 @@ async function sincronizarInterconsultaAtendida(cita: any) {
     console.error("No se pudo sincronizar interconsulta vinculada:", err);
   }
 }
-
-// ✅ Crea fecha en UTC puro para evitar desfase de zona horaria
-const crearFechaUTC = (fechaString: string): Date => {
-  const [year, month, day] = fechaString.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day));
-};
 
 export const crearCita = async (req: any, res: Response) => {
   try {
@@ -68,12 +63,12 @@ export const crearCita = async (req: any, res: Response) => {
       });
     }
 
-    const citaExistenteDoctor = await Cita.findOne({ doctorId, fecha: fechaUTC, hora, estado: { $nin: ["CANCELADA", "VENCIDA"] } });
+    const citaExistenteDoctor = await Cita.findOne({ doctorId, fecha: fechaUTC, hora, estado: { $in: ESTADOS_OCUPAN_SLOT } });
     if (citaExistenteDoctor) {
       return res.status(400).json({ success: false, message: "Ya existe una cita para ese horario con este doctor" });
     }
 
-    const citaExistentePaciente = await Cita.findOne({ pacienteId, fecha: fechaUTC, hora, estado: { $nin: ["CANCELADA", "VENCIDA"] } });
+    const citaExistentePaciente = await Cita.findOne({ pacienteId, fecha: fechaUTC, hora, estado: { $in: ESTADOS_OCUPAN_SLOT } });
     if (citaExistentePaciente) {
        return res.status(400).json({ success: false, message: "El paciente ya tiene otra cita médica reservada para esta misma fecha y hora" });
     }
@@ -156,9 +151,7 @@ export const reprogramarCita = async (req: Request, res: Response) => {
     }
 
     // Regla de negocio: 24h mínimo antes de la cita.
-    const [horaActual, minActual] = (cita.hora ?? "23:59").split(":").map(Number);
-    const momentoCita = new Date(cita.fecha);
-    momentoCita.setUTCHours(horaActual + 5, minActual, 0, 0);
+    const momentoCita = horaPeruAInstanteUTC(new Date(cita.fecha), cita.hora ?? "23:59");
     const horasRestantes = (momentoCita.getTime() - Date.now()) / (1000 * 60 * 60);
     if (horasRestantes < 24) {
       return res.status(400).json({
@@ -172,13 +165,13 @@ export const reprogramarCita = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: "Formato de nueva fecha inválido" });
     }
 
-    // Conflicto: excluye canceladas/vencidas + la propia cita.
+    // Conflicto: solo cuentan los estados que ocupan el slot, excluyendo la propia cita.
     const citaExistente = await Cita.findOne({
       _id: { $ne: id },
       doctorId: cita.doctorId,
       fecha: fechaUTC,
       hora,
-      estado: { $nin: ["CANCELADA", "VENCIDA"] },
+      estado: { $in: ESTADOS_OCUPAN_SLOT },
     });
     if (citaExistente) {
       return res.status(409).json({ success: false, message: "Ya existe una cita para ese horario" });
@@ -213,11 +206,8 @@ export const obtenerCitasCalendario = async (req: Request, res: Response) => {
   try {
     const { fecha, vista = "mes", medicoId } = req.query;
 
-    // ✅ Parsear fecha en UTC para evitar desfase
-    const [y, m, d] = ((fecha as string) || "").split("-").map(Number);
-    const fechaBase = fecha
-      ? new Date(Date.UTC(y, m - 1, d))
-      : new Date();
+    // ✅ Parsear fecha en UTC para evitar desfase; sin fecha, hoy según calendario Perú.
+    const fechaBase = fecha ? crearFechaUTC(fecha as string) : hoyPeruUTC();
 
     // Limpiar citas vencidas antes de retornar datos al calendario
     await verificarCitasVencidas();

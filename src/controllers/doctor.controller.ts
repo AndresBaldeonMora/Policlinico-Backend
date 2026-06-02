@@ -1,7 +1,8 @@
 import { Request, Response } from "express";
 import { Doctor } from "../models/Doctor";
-import { Cita } from "../models/Cita";
+import { Cita, ESTADOS_OCUPAN_SLOT } from "../models/Cita";
 import { BloqueoHorario } from "../models/BloqueoHorario";
+import { crearFechaUTC, ahoraPeru, hoyPeruUTC } from "../utils/fecha.utils";
 
 // ─── Validaciones ─────────────────────────────────────────
 const soloLetras = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/;
@@ -159,15 +160,12 @@ export const obtenerHorariosDisponibles = async (req: Request, res: Response) =>
       "10:00", "10:30", "11:00", "11:30", "12:00",
     ];
 
-    const fechaInicio = new Date(fecha as string);
-    fechaInicio.setHours(0, 0, 0, 0);
-    const fechaFin = new Date(fecha as string);
-    fechaFin.setHours(23, 59, 59, 999);
+    const fechaUTC = crearFechaUTC(fecha as string);
 
     // Verificar si el día está bloqueado
     const bloqueoActivo = await BloqueoHorario.findOne({
       doctorId: id,
-      fecha: { $gte: fechaInicio, $lte: fechaFin },
+      fecha: fechaUTC,
       activo: true,
     });
 
@@ -182,20 +180,17 @@ export const obtenerHorariosDisponibles = async (req: Request, res: Response) =>
 
     const citasAgendadas = await Cita.find({
       doctorId: id,
-      fecha: { $gte: fechaInicio, $lte: fechaFin },
+      fecha: fechaUTC,
+      estado: { $in: ESTADOS_OCUPAN_SLOT },
     }).select("hora");
 
     const horasOcupadas = new Set(citasAgendadas.map((c) => c.hora));
 
-    // Si la fecha solicitada es hoy (hora Peru UTC-5), descartar horas ya pasadas
-    const ahoraPeru = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Lima" }));
-    const [anioFecha, mesFecha, diaFecha] = (fecha as string).split("-").map(Number);
-    const esHoy =
-      anioFecha     === ahoraPeru.getFullYear() &&
-      mesFecha - 1  === ahoraPeru.getMonth()    &&
-      diaFecha      === ahoraPeru.getDate();
-
-    const minutosActuales = esHoy ? ahoraPeru.getHours() * 60 + ahoraPeru.getMinutes() : -1;
+    // Si la fecha solicitada es hoy (calendario Perú), descartar horas ya pasadas.
+    // ahoraPeru() traslada el instante a UTC-5; sus componentes UTC son la hora local peruana.
+    const peru = ahoraPeru();
+    const esHoy = fechaUTC.getTime() === hoyPeruUTC().getTime();
+    const minutosActuales = esHoy ? peru.getUTCHours() * 60 + peru.getUTCMinutes() : -1;
 
     const horariosDisponibles = horariosBase.map((hora) => {
       const [h, m] = hora.split(":").map(Number);

@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from "mongoose";
+import { hoyPeruUTC } from "../utils/fecha.utils";
 
 export interface IAlergia {
   sustancia: string;
@@ -150,15 +151,16 @@ const pacienteSchema = new Schema<IPaciente>(
   }
 );
 
-// Virtual edad
+// Virtual edad — comparación en UTC: fechaNacimiento se guarda como
+// medianoche UTC y hoy se toma según el calendario peruano (también UTC).
 pacienteSchema.virtual("edad").get(function () {
   if (!this.fechaNacimiento) return null;
-  const hoy = new Date();
+  const hoy = hoyPeruUTC();
   const nac = new Date(this.fechaNacimiento);
-  let edad = hoy.getFullYear() - nac.getFullYear();
+  let edad = hoy.getUTCFullYear() - nac.getUTCFullYear();
   if (
-    hoy.getMonth() < nac.getMonth() ||
-    (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())
+    hoy.getUTCMonth() < nac.getUTCMonth() ||
+    (hoy.getUTCMonth() === nac.getUTCMonth() && hoy.getUTCDate() < nac.getUTCDate())
   ) edad--;
   return edad;
 });

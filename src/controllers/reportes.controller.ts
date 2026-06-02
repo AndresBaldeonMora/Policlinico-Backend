@@ -2,6 +2,7 @@ import { Response } from "express";
 import { OrdenExamen } from "../models/OrdenExamen";
 import { Cita } from "../models/Cita";
 import { AuthRequest } from "../middlewares/authMiddlewares";
+import { finDelDiaUTC } from "../utils/fecha.utils";
 
 // ─────────────────────────────────────────────────────────────
 // REPORTES
@@ -20,7 +21,7 @@ export const reporteOrdenesPorPeriodo = async (req: AuthRequest, res: Response) 
         $match: {
           createdAt: {
             $gte: new Date(fechaInicio as string),
-            $lte: new Date(fechaFin as string),
+            $lte: finDelDiaUTC(fechaFin as string),
           },
         },
       },
@@ -68,8 +69,7 @@ export const reporteCitasPorPeriodo = async (req: AuthRequest, res: Response) =>
       return res.status(400).json({ success: false, message: "fechaInicio y fechaFin son obligatorios" });
     }
 
-    const fin = new Date(fechaFin as string);
-    fin.setHours(23, 59, 59, 999);
+    const fin = finDelDiaUTC(fechaFin as string);
 
     const citas = await Cita.aggregate([
       {
@@ -98,8 +98,7 @@ export const reporteCitasPorEspecialidad = async (req: AuthRequest, res: Respons
 
     const match: Record<string, unknown> = {};
     if (fechaInicio && fechaFin) {
-      const fin = new Date(fechaFin as string);
-      fin.setHours(23, 59, 59, 999);
+      const fin = finDelDiaUTC(fechaFin as string);
       match.fecha = { $gte: new Date(fechaInicio as string), $lte: fin };
     }
 

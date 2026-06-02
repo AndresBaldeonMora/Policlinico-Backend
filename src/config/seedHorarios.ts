@@ -15,6 +15,7 @@ dotenv.config();
 
 import { Doctor }  from "../models/Doctor";
 import { Horario } from "../models/Horario";
+import { hoyPeruUTC } from "../utils/fecha.utils";
 
 const SLOTS_MANANA  = ["08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30"];
 const SLOTS_TARDE   = ["14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30"];
@@ -22,17 +23,15 @@ const TODOS_SLOTS   = [...SLOTS_MANANA, ...SLOTS_TARDE];
 
 function proximosDiasHabiles(cuantos: number): Date[] {
   const dias: Date[] = [];
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  let cursor = new Date(hoy);
-  cursor.setDate(cursor.getDate() + 1); // empezar desde mañana
+  const cursor = hoyPeruUTC();          // medianoche UTC del día peruano
+  cursor.setUTCDate(cursor.getUTCDate() + 1); // empezar desde mañana
 
   while (dias.length < cuantos) {
-    const dow = cursor.getDay(); // 0=dom, 6=sab
-    if (dow !== 0) {             // excluir domingos
+    const dow = cursor.getUTCDay(); // 0=dom, 6=sab
+    if (dow !== 0) {                // excluir domingos
       dias.push(new Date(cursor));
     }
-    cursor.setDate(cursor.getDate() + 1);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   return dias;
 }
@@ -52,13 +51,13 @@ async function seedHorarios() {
   console.log(`👨‍⚕️  ${doctores.length} doctores encontrados`);
 
   // Eliminar horarios futuros existentes (no tocar los ya reservados del pasado)
-  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const hoy = hoyPeruUTC();
   const deleted = await Horario.deleteMany({ fecha: { $gte: hoy }, reservado: false });
   console.log(`🗑️  ${deleted.deletedCount} horarios libres futuros eliminados\n`);
 
   const dias = proximosDiasHabiles(14);
   console.log(`📅  Generando horarios para ${dias.length} días hábiles:`);
-  dias.forEach(d => console.log(`   • ${d.toLocaleDateString("es-PE", { weekday: "long", day: "2-digit", month: "short" })}`));
+  dias.forEach(d => console.log(`   • ${d.toLocaleDateString("es-PE", { weekday: "long", day: "2-digit", month: "short", timeZone: "UTC" })}`));
 
   const horarios: any[] = [];
 

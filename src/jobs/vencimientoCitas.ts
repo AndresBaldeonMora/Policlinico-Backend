@@ -1,5 +1,6 @@
 import { Cita } from "../models/Cita";
 import { AuditLog } from "../models/AuditLog";
+import { hoyPeruUTC, horaPeruAInstanteUTC } from "../utils/fecha.utils";
 
 /**
  * Marca como VENCIDAS:
@@ -9,8 +10,8 @@ import { AuditLog } from "../models/AuditLog";
 export const verificarCitasVencidas = async (): Promise<number> => {
   const ahora = new Date();
 
-  const inicioDia = new Date(ahora);
-  inicioDia.setUTCHours(0, 0, 0, 0);
+  // Hoy según el calendario peruano, como medianoche UTC.
+  const inicioDia = hoyPeruUTC();
 
   // PENDIENTE/REPROGRAMADA: hoy o antes (con gracia de 30 min)
   const citasPendientes = await Cita.find({
@@ -38,12 +39,9 @@ export const verificarCitasVencidas = async (): Promise<number> => {
       // Jornada cerrada sin atención — vencer sin gracia
       motivo = "Paciente en sala no fue atendido al concluir la jornada.";
     } else {
-      // PENDIENTE/REPROGRAMADA: aplicar gracia de 30 minutos
-      // `hora` es hora local de Perú (UTC-5); `fecha` es medianoche UTC del día.
-      // Sumamos 5h para convertir la hora local al instante UTC real.
-      const [horas, minutos] = (cita.hora ?? "23:59").split(":").map(Number);
-      const citaMomento = new Date(cita.fecha);
-      citaMomento.setUTCHours(horas + 5, minutos, 0, 0);
+      // PENDIENTE/REPROGRAMADA: aplicar gracia de 30 minutos.
+      // `hora` es hora local de Perú; horaPeruAInstanteUTC la convierte al instante UTC real.
+      const citaMomento = horaPeruAInstanteUTC(new Date(cita.fecha), cita.hora ?? "23:59");
       const limite = new Date(citaMomento.getTime() + 30 * 60 * 1000);
       if (ahora <= limite) continue;
       motivo = "Paciente no asistió 30 minutos después de la hora programada.";

@@ -1,19 +1,19 @@
 import { OrdenExamen } from "../models/OrdenExamen";
+import { hoyPeruUTC, finDelDiaUTC } from "./fecha.utils";
 
 /**
  * Genera un código único de orden con formato ORD-YYYYMMDD-XXXX
- * donde XXXX es un secuencial del día.
+ * donde XXXX es un secuencial del día (calendario peruano).
  */
 export const generarCodigoOrden = async (): Promise<string> => {
-  const hoy = new Date();
-  const y = hoy.getFullYear();
-  const m = String(hoy.getMonth() + 1).padStart(2, "0");
-  const d = String(hoy.getDate()).padStart(2, "0");
+  const inicioDelDia = hoyPeruUTC();
+  const y = inicioDelDia.getUTCFullYear();
+  const m = String(inicioDelDia.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(inicioDelDia.getUTCDate()).padStart(2, "0");
   const prefijo = `ORD-${y}${m}${d}`;
 
   // Contar órdenes del día para el secuencial
-  const inicioDelDia = new Date(y, hoy.getMonth(), hoy.getDate(), 0, 0, 0);
-  const finDelDia = new Date(y, hoy.getMonth(), hoy.getDate(), 23, 59, 59, 999);
+  const finDelDia = finDelDiaUTC(inicioDelDia);
 
   const count = await OrdenExamen.countDocuments({
     fecha: { $gte: inicioDelDia, $lte: finDelDia },
