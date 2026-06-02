@@ -359,6 +359,59 @@ export const actualizarHistorialClinico = async (req: AuthRequest, res: Response
   }
 };
 
+// Actualizar historia clínica por especialidad — merge campos específicos
+export const actualizarHistoriaClinicaEspecialidad = async (req: AuthRequest, res: Response) => {
+  try {
+    const idRaw = req.params.id;
+    const id = Array.isArray(idRaw) ? idRaw[0] : idRaw;
+    if (!id || !mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "ID inválido" });
+    }
+
+    const rol = String(req.user?.rol ?? "").toUpperCase();
+    const medicoId = req.user?.medicoId;
+
+    // Si es MEDICO, debe haber al menos una cita con ese paciente.
+    if (rol === "MEDICO") {
+      if (!medicoId) {
+        return res.status(403).json({ success: false, message: "Usuario no vinculado a un perfil médico" });
+      }
+      const tieneRelacion = await Cita.exists({
+        pacienteId: new mongoose.Types.ObjectId(id),
+        doctorId: new mongoose.Types.ObjectId(String(medicoId)),
+      });
+      if (!tieneRelacion) {
+        return res.status(403).json({
+          success: false,
+          message: "Sólo puedes editar el historial de pacientes que has atendido",
+        });
+      }
+    }
+
+    const { especialidad, campos } = req.body;
+    if (!especialidad || typeof especialidad !== "string") {
+      return res.status(400).json({ success: false, message: "Campo 'especialidad' requerido" });
+    }
+    if (!campos || typeof campos !== "object") {
+      return res.status(400).json({ success: false, message: "Campo 'campos' requerido" });
+    }
+
+    const paciente = await Paciente.findById(id);
+    if (!paciente) return res.status(404).json({ success: false, message: "Paciente no encontrado" });
+
+    const historialActual = paciente.historiaClinicaEspecialidad ?? {};
+    historialActual[especialidad] = { ...historialActual[especialidad], ...campos };
+    paciente.historiaClinicaEspecialidad = historialActual;
+    paciente.markModified("historiaClinicaEspecialidad");
+    await paciente.save();
+
+    res.json({ success: true, message: "Historia clínica actualizada", data: paciente.historiaClinicaEspecialidad });
+  } catch (error: any) {
+    console.error("actualizarHistoriaClinicaEspecialidad:", error);
+    res.status(500).json({ success: false, message: "Error al actualizar historia clínica" });
+  }
+};
+
 export const eliminarPaciente = async (req: Request, res: Response) => {
   try {
     const paciente = await Paciente.findByIdAndDelete(req.params.id);

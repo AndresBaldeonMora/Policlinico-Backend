@@ -53,6 +53,7 @@ export interface IPaciente extends Document {
   problemasMedicos: IProblemaMedico[];
   cirugiasPrevias: ICirugiaPevia[];
   antecedentesFamiliares: IAntecedenteFamiliar[];
+  historiaClinicaEspecialidad?: Record<string, Record<string, string>>;
   edad?: number; // virtual
 }
 
@@ -142,6 +143,10 @@ const pacienteSchema = new Schema<IPaciente>(
       }],
       validate: { validator: (v: any[]) => v.length <= 200, message: "Máximo 200 antecedentes familiares" },
       default: [],
+    },
+    historiaClinicaEspecialidad: {
+      type: Schema.Types.Mixed,
+      default: {},
     },
   },
   {
