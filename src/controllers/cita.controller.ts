@@ -190,6 +190,7 @@ export const reprogramarCita = async (req: Request, res: Response) => {
       });
     }
 
+    const estadoAnterior = cita.estado;
     const fechaOriginal = new Date(cita.fecha).toLocaleDateString("es-PE");
     const horaOriginal = cita.hora;
     const fechaNueva = new Date(fechaUTC).toLocaleDateString("es-PE");
@@ -209,7 +210,16 @@ export const reprogramarCita = async (req: Request, res: Response) => {
         entidadId: cita._id,
         usuarioId: usuario?.userId ? new mongoose.Types.ObjectId(usuario.userId) : undefined,
         usuarioNombre: usuario ? `${usuario.nombres ?? ""} ${usuario.apellidos ?? ""}`.trim() : undefined,
+        estadoAnterior,
+        estadoNuevo: "REPROGRAMADA",
         descripcion: `Reprogramada de ${fechaOriginal} ${horaOriginal} a ${fechaNueva} ${hora}`,
+        detalles: {
+          fechaOriginal: momentoCita.toISOString(),
+          horaOriginal,
+          fechaNueva: fechaUTC.toISOString(),
+          horaNueva: hora,
+        },
+        ipAddress: (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ?? req.ip,
         timestamp: new Date(),
       });
     } catch (logErr) {

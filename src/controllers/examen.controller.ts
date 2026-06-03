@@ -226,7 +226,7 @@ export const crearOrden = async (req: AuthRequest, res: Response) => {
       .populate("pacienteId", "nombres apellidos dni")
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo preguntasProtocolares");
+      .populate("items.examenId", "nombre tipo precio instrucciones preguntasProtocolares");
 
     res.status(201).json({ success: true, data: ordenPoblada });
 
@@ -376,7 +376,7 @@ export const autorizarOrden = async (req: AuthRequest, res: Response) => {
       .populate("pacienteId", "nombres apellidos dni")
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo instrucciones preguntasProtocolares");
+      .populate("items.examenId", "nombre tipo precio instrucciones preguntasProtocolares");
 
     res.json({ success: true, data: ordenActualizada });
 
@@ -441,7 +441,7 @@ export const registrarAsistencia = async (req: AuthRequest, res: Response) => {
       .populate("pacienteId", "nombres apellidos dni")
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo instrucciones preguntasProtocolares");
+      .populate("items.examenId", "nombre tipo precio instrucciones preguntasProtocolares");
 
     res.json({ success: true, data: ordenActualizada });
 
@@ -513,7 +513,7 @@ export const finalizarOrden = async (
       .populate("pacienteId", "nombres apellidos dni fechaNacimiento sexo correo")
       .populate("doctorId", "nombres apellidos cmp")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo preguntasProtocolares");
+      .populate("items.examenId", "nombre tipo precio instrucciones preguntasProtocolares");
 
     res.json({ success: true, data: ordenActualizada });
 
@@ -670,7 +670,7 @@ export const listarOrdenesPorEstado = async (req: Request, res: Response) => {
       .populate("pacienteId", "nombres apellidos dni")
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo instrucciones preguntasProtocolares")
+      .populate("items.examenId", "nombre tipo precio instrucciones preguntasProtocolares")
       .sort({ fecha: -1 });
 
     res.json({ success: true, data: ordenes });
@@ -709,7 +709,7 @@ export const listarOrdenesPendientes = async (req: Request, res: Response) => {
       .populate("pacienteId", "nombres apellidos dni")
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo preguntasProtocolares")
+      .populate("items.examenId", "nombre tipo precio instrucciones preguntasProtocolares")
       .sort({ fecha: -1 });
 
     res.json({ success: true, data: ordenes });
@@ -726,7 +726,7 @@ export const obtenerOrden = async (req: any, res: Response) => {
       .populate("pacienteId", "nombres apellidos dni fechaNacimiento sexo")
       .populate("doctorId", "nombres apellidos cmp")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo instrucciones preguntasProtocolares");
+      .populate("items.examenId", "nombre tipo precio instrucciones preguntasProtocolares");
     if (!orden)
       return res.status(404).json({ success: false, message: "Orden no encontrada" });
 
@@ -766,7 +766,7 @@ export const listarOrdenesPorPaciente = async (req: any, res: Response) => {
     const ordenes = await OrdenExamen.find(filtro)
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo preguntasProtocolares")
+      .populate("items.examenId", "nombre tipo precio instrucciones preguntasProtocolares")
       .sort({ fecha: -1 });
     res.json({ success: true, data: ordenes });
   } catch (error: any) {
@@ -782,7 +782,7 @@ export const listarOrdenesPorCita = async (req: Request, res: Response) => {
       .populate("pacienteId", "nombres apellidos dni")
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo preguntasProtocolares");
+      .populate("items.examenId", "nombre tipo precio instrucciones preguntasProtocolares");
     res.json({ success: true, data: ordenes });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
@@ -802,7 +802,7 @@ export const buscarOrdenPorCodigo = async (req: Request, res: Response) => {
       .populate("pacienteId", "nombres apellidos dni fechaNacimiento sexo")
       .populate("doctorId", "nombres apellidos cmp")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo instrucciones preguntasProtocolares");
+      .populate("items.examenId", "nombre tipo precio instrucciones preguntasProtocolares");
 
     if (!orden)
       return res
@@ -886,7 +886,7 @@ export const actualizarOrden = async (req: AuthRequest, res: Response) => {
       .populate("pacienteId", "nombres apellidos dni")
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo instrucciones preguntasProtocolares");
+      .populate("items.examenId", "nombre tipo precio instrucciones preguntasProtocolares");
 
     res.json({ success: true, data: ordenActualizada });
   } catch (error: any) {
@@ -906,7 +906,7 @@ export const obtenerOrdenParaImprimir = async (req: any, res: Response) => {
         populate: { path: "especialidadId", select: "nombre" },
       })
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo descripcion instrucciones");
+      .populate("items.examenId", "nombre tipo precio descripcion instrucciones preguntasProtocolares");
 
     if (!orden)
       return res.status(404).json({ success: false, message: "Orden no encontrada" });
@@ -1034,7 +1034,7 @@ export const cargarResultados = async (
       .populate("pacienteId", "nombres apellidos dni")
       .populate("doctorId", "nombres apellidos")
       .populate("especialidadId", "nombre")
-      .populate("items.examenId", "nombre tipo instrucciones preguntasProtocolares");
+      .populate("items.examenId", "nombre tipo precio instrucciones preguntasProtocolares");
 
     res.json({ success: true, data: ordenActualizada });
   } catch (error: any) {

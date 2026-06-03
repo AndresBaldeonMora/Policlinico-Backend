@@ -10,23 +10,26 @@ export type EstadoInterconsulta =
 
 export interface IInterconsulta extends Document {
   pacienteId: mongoose.Types.ObjectId;
-  citaId?: mongoose.Types.ObjectId;          // Cita de origen (consulta donde se solicitó)
-  solicitanteId: mongoose.Types.ObjectId;     // Médico que solicita
-  solicitanteNombre: string;                  // Nombre del solicitante al momento de crear
-  especialidadSolicitada: string;             // Especialidad destino (texto)
-  medicoSolicitado?: string;                  // Nombre libre del médico sugerido (opcional)
-  destinatarioId?: mongoose.Types.ObjectId;   // Médico destinatario concreto (opcional)
+  citaId?: mongoose.Types.ObjectId;
+  solicitanteId: mongoose.Types.ObjectId;
+  solicitanteNombre: string;
+  solicitanteEspecialidad?: string;           // Especialidad del médico solicitante (trazabilidad)
+  especialidadSolicitada: string;
+  medicoSolicitado?: string;
+  destinatarioId?: mongoose.Types.ObjectId;
   prioridad: PrioridadInterconsulta;
+  diagnosticoPresuntivo?: string;             // NTS-139: diagnóstico de trabajo del solicitante
   motivoConsulta: string;
   preguntaClinica?: string;
   informacionRelevante?: string;
   estado: EstadoInterconsulta;
+  motivoCancelacion?: string;                 // Justificación si estado === CANCELADA
   // Respuesta del especialista
   respuesta?: string;
   respondidoPorId?: mongoose.Types.ObjectId;
   respondidoPorNombre?: string;
+  respondidoPorCMP?: string;                  // N° colegiatura del especialista (requisito legal)
   fechaRespuesta?: Date;
-  // Cita presencial generada como respuesta (estado CITADA)
   citaGeneradaId?: mongoose.Types.ObjectId;
 }
 
@@ -45,18 +48,22 @@ const interconsultaSchema = new Schema<IInterconsulta>(
       default: "electiva",
       required: true,
     },
-    motivoConsulta:       { type: String, required: true, trim: true },
-    preguntaClinica:      { type: String, trim: true, default: "" },
-    informacionRelevante: { type: String, trim: true, default: "" },
+    solicitanteEspecialidad: { type: String, trim: true, default: "" },
+    diagnosticoPresuntivo:   { type: String, trim: true, default: "" },
+    motivoConsulta:          { type: String, required: true, trim: true },
+    preguntaClinica:         { type: String, trim: true, default: "" },
+    informacionRelevante:    { type: String, trim: true, default: "" },
     estado: {
       type: String,
       enum: ["PENDIENTE", "RESPONDIDA", "CITADA", "ATENDIDA", "CANCELADA"],
       default: "PENDIENTE",
       required: true,
     },
+    motivoCancelacion:   { type: String, trim: true, default: "" },
     respuesta:           { type: String, trim: true, default: "" },
     respondidoPorId:     { type: Schema.Types.ObjectId, ref: "Doctor" },
     respondidoPorNombre: { type: String, trim: true, default: "" },
+    respondidoPorCMP:    { type: String, trim: true, default: "" },
     fechaRespuesta:      { type: Date },
     citaGeneradaId:      { type: Schema.Types.ObjectId, ref: "Cita" },
   },

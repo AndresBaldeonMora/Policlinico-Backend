@@ -11,26 +11,16 @@ import { ExamenLaboratorioImagen } from "../models/ExamenLaboratorioImagen";
 import { OrdenExamen } from "../models/OrdenExamen";
 
 const especialidades = [
-  { nombre: "Pediatría", tieneLaboratorioImagen: true },
-  { nombre: "Medicina Interna", tieneLaboratorioImagen: true },
-  { nombre: "Ginecología", tieneLaboratorioImagen: true },
-  { nombre: "Cardiología", tieneLaboratorioImagen: true },
-  { nombre: "Oftalmología", tieneLaboratorioImagen: false },
-  { nombre: "Medicina Física y Rehabilitación", tieneLaboratorioImagen: false },
-  { nombre: "Neumología", tieneLaboratorioImagen: true },
-  { nombre: "Reumatología", tieneLaboratorioImagen: true },
-  { nombre: "Radiología", tieneLaboratorioImagen: false },
-  { nombre: "Gastroenterología", tieneLaboratorioImagen: true },
-  { nombre: "Odontología", tieneLaboratorioImagen: false },
-  { nombre: "Endocrinología", tieneLaboratorioImagen: true },
-  { nombre: "Traumatología", tieneLaboratorioImagen: false },
-  { nombre: "Geriatría", tieneLaboratorioImagen: true },
-  { nombre: "Medicina", tieneLaboratorioImagen: true },
-  { nombre: "Medicina Familiar", tieneLaboratorioImagen: true },
-  { nombre: "Ecografías", tieneLaboratorioImagen: false },
-  { nombre: "Otorrinolaringología", tieneLaboratorioImagen: false },
-  { nombre: "Urología", tieneLaboratorioImagen: true },
-  { nombre: "Cosmiatría", tieneLaboratorioImagen: false },
+  { nombre: "Medicina General",          tieneLaboratorioImagen: true,  consultorio: 1  },
+  { nombre: "Pediatría",                 tieneLaboratorioImagen: true,  consultorio: 2  },
+  { nombre: "Odontología",               tieneLaboratorioImagen: false, consultorio: 3  },
+  { nombre: "Reumatología",              tieneLaboratorioImagen: true,  consultorio: 4  },
+  { nombre: "Ginecología y Obstetricia", tieneLaboratorioImagen: true,  consultorio: 5  },
+  { nombre: "Cardiología",               tieneLaboratorioImagen: true,  consultorio: 6  },
+  { nombre: "Endocrinología",            tieneLaboratorioImagen: true,  consultorio: 7  },
+  { nombre: "Neumología",                tieneLaboratorioImagen: true,  consultorio: 8  },
+  { nombre: "Gastroenterología",         tieneLaboratorioImagen: true,  consultorio: 9  },
+  { nombre: "Psiquiatría",               tieneLaboratorioImagen: false, consultorio: 10 },
 ];
 
 const medicamentos = [

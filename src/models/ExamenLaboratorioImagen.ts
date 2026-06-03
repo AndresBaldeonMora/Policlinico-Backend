@@ -33,6 +33,7 @@ export interface IExamenLaboratorioImagen extends Document {
   instrucciones: string;
   preguntasProtocolares: IPreguntaProtocolar[];
   validezDias: number;
+  precio: number;
   activo: boolean;
 }
 
@@ -64,6 +65,7 @@ const examenLaboratorioImagenSchema = new Schema<IExamenLaboratorioImagen>(
     instrucciones:          { type: String, trim: true, default: "" },
     preguntasProtocolares:  { type: [preguntaProtocolarSchema], default: [] },
     validezDias:            { type: Number, default: 7, min: 1 },
+    precio:                 { type: Number, default: 0, min: 0 },
     activo:                 { type: Boolean, default: true },
   },
   { timestamps: true }

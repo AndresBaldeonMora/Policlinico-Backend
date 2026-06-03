@@ -31,6 +31,7 @@ const examenes = [
   {
     nombre: "Hemograma Completo (Biometría Hemática)",
     tipo: "HEMATOLOGIA",
+    precio: 30,
     descripcion: "Recuento de eritrocitos, leucocitos, plaquetas, hemoglobina y hematocrito.",
     instrucciones: "Ayuno de 4 horas. Evitar ejercicio intenso las 24 horas previas.",
     validezDias: 7,
@@ -73,6 +74,7 @@ const examenes = [
   {
     nombre: "Perfil de Coagulación (TP, TPA, Fibrinógeno)",
     tipo: "HEMATOLOGIA",
+    precio: 50,
     descripcion: "Evaluación del sistema hemostático: tiempo de protrombina, tiempo de tromboplastina parcial activada y fibrinógeno.",
     instrucciones: "Ayuno de 4 horas. Informar uso de anticoagulantes.",
     validezDias: 7,
@@ -108,6 +110,7 @@ const examenes = [
   {
     nombre: "Tipificación Sanguínea (Grupo y Factor Rh)",
     tipo: "HEMATOLOGIA",
+    precio: 20,
     descripcion: "Determinación del grupo sanguíneo ABO y factor Rh.",
     instrucciones: "No requiere ayuno.",
     validezDias: 30,
@@ -136,6 +139,7 @@ const examenes = [
   {
     nombre: "Velocidad de Sedimentación Globular (VSG / Wintrobe)",
     tipo: "HEMATOLOGIA",
+    precio: 20,
     descripcion: "Marcador inespecífico de inflamación sistémica.",
     instrucciones: "Ayuno de 4 horas recomendado.",
     validezDias: 7,
@@ -176,6 +180,7 @@ const examenes = [
   {
     nombre: "Perfil Glucémico (Glucosa en Ayunas)",
     tipo: "BIOQUIMICA",
+    precio: 20,
     descripcion: "Medición de glucosa sérica en condiciones de ayuno.",
     instrucciones: "Ayuno estricto de 8 horas. Solo agua permitida.",
     validezDias: 7,
@@ -210,6 +215,7 @@ const examenes = [
   {
     nombre: "Curva de Tolerancia a la Glucosa (PTOG 75g)",
     tipo: "BIOQUIMICA",
+    precio: 40,
     descripcion: "Prueba de carga de glucosa oral para diagnóstico de diabetes gestacional o intolerancia.",
     instrucciones: "Ayuno de 8 horas. Dieta libre los 3 días previos (no restricción de carbohidratos).",
     validezDias: 7,
@@ -243,6 +249,7 @@ const examenes = [
   {
     nombre: "Perfil Lipídico Completo",
     tipo: "BIOQUIMICA",
+    precio: 50,
     descripcion: "Colesterol total, HDL, LDL, triglicéridos y VLDL.",
     instrucciones: "Ayuno de 12 horas. Evitar alcohol 48 horas antes.",
     validezDias: 7,
@@ -277,6 +284,7 @@ const examenes = [
   {
     nombre: "Perfil Hepático",
     tipo: "BIOQUIMICA",
+    precio: 65,
     descripcion: "TGO, TGP, fosfatasa alcalina, bilirrubinas total/directa/indirecta, proteínas totales.",
     instrucciones: "Ayuno de 8 horas.",
     validezDias: 7,
@@ -310,6 +318,7 @@ const examenes = [
   {
     nombre: "Perfil Renal (Creatinina, Urea, Ácido Úrico)",
     tipo: "BIOQUIMICA",
+    precio: 45,
     descripcion: "Evaluación de función renal: creatinina sérica, urea, nitrógeno ureico y ácido úrico.",
     instrucciones: "Ayuno de 8 horas. Hidratación normal.",
     validezDias: 7,
@@ -344,6 +353,7 @@ const examenes = [
   {
     nombre: "Proteína C Reactiva (PCR)",
     tipo: "BIOQUIMICA",
+    precio: 30,
     descripcion: "Marcador sensible de inflamación aguda y crónica.",
     instrucciones: "No requiere ayuno.",
     validezDias: 7,
@@ -365,6 +375,7 @@ const examenes = [
   {
     nombre: "Antígeno Prostático Específico (PSA Total y Libre)",
     tipo: "BIOQUIMICA",
+    precio: 65,
     descripcion: "Marcador tumoral para cáncer de próstata y seguimiento de hiperplasia benigna.",
     instrucciones: "Abstinencia sexual 48 horas antes. No realizar tacto rectal ni cistoscopia las 72 horas previas.",
     validezDias: 7,
@@ -392,6 +403,7 @@ const examenes = [
   {
     nombre: "Electrolitos Séricos (Na, K, Cl, Ca, P)",
     tipo: "BIOQUIMICA",
+    precio: 55,
     descripcion: "Sodio, potasio, cloro, calcio y fósforo séricos.",
     instrucciones: "Ayuno de 4 horas.",
     validezDias: 7,
@@ -426,6 +438,7 @@ const examenes = [
   {
     nombre: "Examen General de Orina (EGO / Uroanálisis)",
     tipo: "ORINA",
+    precio: 20,
     descripcion: "Análisis físico, químico y microscópico de orina.",
     instrucciones: "Primera orina de la mañana. Aseo genital previo. Muestra de chorro medio en frasco estéril.",
     validezDias: 7,
@@ -461,6 +474,7 @@ const examenes = [
   {
     nombre: "Urocultivo con Antibiograma",
     tipo: "ORINA",
+    precio: 45,
     descripcion: "Cultivo microbiológico de orina para identificar gérmenes y determinar sensibilidad antibiótica.",
     instrucciones: "Primera orina de la mañana. Aseo genital riguroso. Frasco estéril. No tomar antibióticos 48 horas antes.",
     validezDias: 7,
@@ -494,6 +508,7 @@ const examenes = [
   {
     nombre: "Microalbuminuria en Orina de 24 Horas",
     tipo: "ORINA",
+    precio: 40,
     descripcion: "Cuantificación de albúmina en orina de 24 horas para detección de nefropatía precoz.",
     instrucciones: "Recolección de orina completa de 24 horas. Primer chorro del día se descarta, luego recolectar todo hasta el día siguiente.",
     validezDias: 7,
@@ -533,6 +548,7 @@ const examenes = [
   {
     nombre: "Coproparasitológico Seriado (Examen de Parásitos en Heces)",
     tipo: "HECES",
+    precio: 25,
     descripcion: "Identificación de parásitos intestinales: protozoos y helmintos.",
     instrucciones: "3 muestras en días alternos. Frasco limpio con tapa. No usar laxantes ni antiparasitarios los 7 días previos.",
     validezDias: 7,
@@ -568,6 +584,7 @@ const examenes = [
   {
     nombre: "Sangre Oculta en Heces (SOH)",
     tipo: "HECES",
+    precio: 25,
     descripcion: "Detección de sangre oculta en heces para cribado de patología gastrointestinal.",
     instrucciones: "Dieta libre de carne roja, vitamina C y AINEs los 3 días previos. No tomar la muestra durante la menstruación.",
     validezDias: 7,
@@ -602,6 +619,7 @@ const examenes = [
   {
     nombre: "Coprocultivo con Antibiograma",
     tipo: "HECES",
+    precio: 45,
     descripcion: "Cultivo de heces para identificación de patógenos bacterianos: Salmonella, Shigella, Campylobacter, E. coli.",
     instrucciones: "Muestra fresca en frasco estéril. No usar antibióticos 48 horas antes.",
     validezDias: 7,
@@ -630,6 +648,7 @@ const examenes = [
   {
     nombre: "Antígeno de H. pylori en Heces",
     tipo: "HECES",
+    precio: 50,
     descripcion: "Detección del antígeno de Helicobacter pylori en heces. Útil para diagnóstico y control post-erradicación.",
     instrucciones: "Suspender antibióticos 2 semanas antes. Suspender inhibidores de bomba de protones 2 semanas antes. Suspender bismuto 4 semanas antes.",
     validezDias: 7,
@@ -671,6 +690,7 @@ const examenes = [
   {
     nombre: "Cultivo de Secreción con Antibiograma",
     tipo: "MICROBIOLOGIA",
+    precio: 50,
     descripcion: "Cultivo de secreción (faríngea, herida, ótica, uretral, vaginal u otra) para identificación bacteriana y antibiograma.",
     instrucciones: "Toma de muestra por personal de salud antes de iniciar antibióticos.",
     validezDias: 7,
@@ -700,6 +720,7 @@ const examenes = [
   {
     nombre: "Baciloscopía para Tuberculosis (BK — Seriada x3)",
     tipo: "MICROBIOLOGIA",
+    precio: 30,
     descripcion: "Examen microscópico de esputo para identificación de Mycobacterium tuberculosis. Se requieren 3 muestras seriadas.",
     instrucciones: "Muestra de esputo al despertar (mínimo 3–5 mL). Recolectar en recipiente estéril. No usar enjuague bucal previo.",
     validezDias: 7,
@@ -742,6 +763,7 @@ const examenes = [
   {
     nombre: "Test Rápido de Dengue (NS1, IgM, IgG)",
     tipo: "MICROBIOLOGIA",
+    precio: 45,
     descripcion: "Detección de antígeno NS1 y anticuerpos IgM/IgG para diagnóstico de dengue. Endémico en zonas costeras y selváticas del Perú.",
     instrucciones: "No requiere ayuno. Indicar fecha de inicio de fiebre.",
     validezDias: 7,
@@ -781,6 +803,7 @@ const examenes = [
   {
     nombre: "Prueba Rápida de VIH (Elisa / Inmunocromatografía)",
     tipo: "INMUNOLOGIA",
+    precio: 25,
     descripcion: "Tamizaje de anticuerpos contra VIH-1 y VIH-2.",
     instrucciones: "No requiere ayuno. Se requiere consentimiento informado firmado.",
     validezDias: 30,
@@ -808,6 +831,7 @@ const examenes = [
   {
     nombre: "VDRL / RPR (Sífilis)",
     tipo: "INMUNOLOGIA",
+    precio: 25,
     descripcion: "Prueba no treponémica para diagnóstico y control de sífilis.",
     instrucciones: "No requiere ayuno. Informar tratamientos previos.",
     validezDias: 30,
@@ -836,6 +860,7 @@ const examenes = [
   {
     nombre: "Hepatitis B (HBsAg, Anti-HBs, Anti-HBc)",
     tipo: "INMUNOLOGIA",
+    precio: 55,
     descripcion: "Perfil serológico para hepatitis B: antígeno de superficie, anticuerpos de superficie y core.",
     instrucciones: "No requiere ayuno.",
     validezDias: 30,
@@ -863,6 +888,7 @@ const examenes = [
   {
     nombre: "Factor Reumatoide y Anti-CCP",
     tipo: "INMUNOLOGIA",
+    precio: 65,
     descripcion: "Marcadores serológicos para diagnóstico de artritis reumatoide.",
     instrucciones: "No requiere ayuno.",
     validezDias: 30,
@@ -890,6 +916,7 @@ const examenes = [
   {
     nombre: "Beta-HCG Cuantitativa (Prueba de Embarazo)",
     tipo: "INMUNOLOGIA",
+    precio: 35,
     descripcion: "Dosaje cuantitativo de gonadotropina coriónica humana para diagnóstico y seguimiento de embarazo.",
     instrucciones: "No requiere ayuno. Primera orina de la mañana para mayor concentración si es prueba en orina.",
     validezDias: 7,
@@ -918,6 +945,7 @@ const examenes = [
   {
     nombre: "Perfil Tiroideo (TSH, T3, T4 libre)",
     tipo: "HORMONAS",
+    precio: 80,
     descripcion: "Evaluación completa de la función tiroidea: TSH ultrasensible, T3 total y T4 libre.",
     instrucciones: "No requiere ayuno. Toma de muestra preferiblemente en la mañana.",
     validezDias: 14,
@@ -948,6 +976,7 @@ const examenes = [
   {
     nombre: "Perfil Hormonal Femenino (FSH, LH, Estradiol, Progesterona)",
     tipo: "HORMONAS",
+    precio: 100,
     descripcion: "Evaluación del eje hipofisario-ovárico. Útil en ciclos irregulares, menopausia e infertilidad.",
     instrucciones: "Toma de muestra entre el día 2 y 5 del ciclo menstrual (salvo indicación médica diferente).",
     validezDias: 14,
@@ -970,6 +999,7 @@ const examenes = [
   {
     nombre: "Testosterona Total y Libre",
     tipo: "HORMONAS",
+    precio: 55,
     descripcion: "Medición de testosterona para evaluación de hipogonadismo, síndrome de ovario poliquístico o virilización.",
     instrucciones: "Toma de muestra entre las 7 a.m. y 10 a.m. (pico circadiano de testosterona).",
     validezDias: 14,
@@ -991,6 +1021,7 @@ const examenes = [
   {
     nombre: "Cortisol Sérico (Matutino y Vespertino)",
     tipo: "HORMONAS",
+    precio: 50,
     descripcion: "Evaluación del eje hipotálamo-hipófiso-adrenal. Diagnóstico de Cushing, Addison o insuficiencia suprarrenal.",
     instrucciones: "Cortisol matutino: muestra entre 7–9 a.m. Cortisol vespertino: entre 4–6 p.m. Sin ayuno obligatorio.",
     validezDias: 14,
@@ -1026,6 +1057,7 @@ const examenes = [
   {
     nombre: "Insulina Basal y HOMA-IR",
     tipo: "HORMONAS",
+    precio: 55,
     descripcion: "Insulina en ayunas para cálculo del índice de resistencia a la insulina (HOMA-IR).",
     instrucciones: "Ayuno estricto de 8 horas. No realizar ejercicio el día del examen.",
     validezDias: 14,
@@ -1059,6 +1091,7 @@ const examenes = [
   {
     nombre: "Radiografía de Tórax (PA y Lateral)",
     tipo: "RADIOGRAFIA",
+    precio: 55,
     descripcion: "Evaluación de campos pulmonares, silueta cardíaca y estructuras mediastínicas.",
     instrucciones: "Retirar joyas y objetos metálicos del torso. Protección de tiroides y gónadas cuando sea posible.",
     validezDias: 14,
@@ -1089,6 +1122,7 @@ const examenes = [
   {
     nombre: "Radiografía de Columna Lumbar (AP y Lateral)",
     tipo: "RADIOGRAFIA",
+    precio: 55,
     descripcion: "Evaluación de columna vertebral lumbar: alineación, discos intervertebrales y estructuras óseas.",
     instrucciones: "Retirar cinturón y objetos metálicos de la zona. Protección gonadal.",
     validezDias: 14,
@@ -1117,6 +1151,7 @@ const examenes = [
   {
     nombre: "Radiografía de Extremidades (Miembro Superior o Inferior)",
     tipo: "RADIOGRAFIA",
+    precio: 45,
     descripcion: "Evaluación de huesos de extremidades: fracturas, luxaciones, alteraciones articulares.",
     instrucciones: "Retirar objetos metálicos de la extremidad.",
     validezDias: 14,
@@ -1145,6 +1180,7 @@ const examenes = [
   {
     nombre: "Mamografía Digital Bilateral",
     tipo: "RADIOGRAFIA",
+    precio: 120,
     descripcion: "Estudio de imagen para detección precoz de cáncer de mama. Recomendada anualmente para mujeres > 40 años según RM 490-2018-MINSA.",
     instrucciones: "No aplicar desodorante, talco ni crema en axilas o senos el día del examen. Informar última mamografía previa.",
     validezDias: 365,
@@ -1184,6 +1220,7 @@ const examenes = [
   {
     nombre: "Ecografía Abdominal Total",
     tipo: "ECOGRAFIA",
+    precio: 90,
     descripcion: "Evaluación de órganos abdominales: hígado, vesícula, vías biliares, páncreas, bazo, riñones y estructuras vasculares.",
     instrucciones: "Ayuno de 6 horas. Vejiga semillena (tomar 4 vasos de agua 1 hora antes sin orinar).",
     validezDias: 30,
@@ -1211,6 +1248,7 @@ const examenes = [
   {
     nombre: "Ecografía Pélvica (Suprapúbica o Transvaginal)",
     tipo: "ECOGRAFIA",
+    precio: 90,
     descripcion: "Evaluación de útero, ovarios, próstata o vejiga. Vía suprapúbica o transvaginal según indicación.",
     instrucciones: "Vejiga llena para vía suprapúbica (tomar 1 litro de agua 1 hora antes). Vejiga vacía para transvaginal.",
     validezDias: 30,
@@ -1239,6 +1277,7 @@ const examenes = [
   {
     nombre: "Ecografía Obstétrica",
     tipo: "ECOGRAFIA",
+    precio: 100,
     descripcion: "Control y seguimiento del embarazo: biometría fetal, placenta, líquido amniótico y anatomía fetal.",
     instrucciones: "Vejiga semillena en el primer trimestre. No requiere preparación especial después del primer trimestre.",
     validezDias: 30,
@@ -1269,6 +1308,7 @@ const examenes = [
   {
     nombre: "Ecografía Renal y de Vías Urinarias",
     tipo: "ECOGRAFIA",
+    precio: 90,
     descripcion: "Evaluación de riñones, uréteres y vejiga: litiasis, quistes, hidronefrosis, tumores.",
     instrucciones: "Vejiga llena. Tomar 1 litro de agua 1 hora antes sin orinar.",
     validezDias: 30,
@@ -1296,6 +1336,7 @@ const examenes = [
   {
     nombre: "Ecografía Tiroidea",
     tipo: "ECOGRAFIA",
+    precio: 90,
     descripcion: "Evaluación morfológica de la glándula tiroides: nódulos, volumen, vascularización.",
     instrucciones: "No requiere preparación especial.",
     validezDias: 30,
@@ -1322,6 +1363,7 @@ const examenes = [
   {
     nombre: "Tomografía Computarizada de Cráneo (con y sin contraste)",
     tipo: "TOMOGRAFIA",
+    precio: 300,
     descripcion: "Evaluación de parénquima cerebral, ventrículos, estructuras de fosa posterior y base de cráneo.",
     instrucciones: "Ayuno de 4 horas si se usará contraste. Retirar objetos metálicos de la cabeza.",
     validezDias: 30,
@@ -1363,6 +1405,7 @@ const examenes = [
   {
     nombre: "Tomografía Computarizada de Tórax",
     tipo: "TOMOGRAFIA",
+    precio: 300,
     descripcion: "Evaluación de pulmones, mediastino, pleura y vasos torácicos. Alta resolución para patología pulmonar.",
     instrucciones: "Ayuno de 4 horas si se usará contraste. Retirar objetos metálicos del tórax.",
     validezDias: 30,
@@ -1403,6 +1446,7 @@ const examenes = [
   {
     nombre: "Tomografía Computarizada Abdominopélvica",
     tipo: "TOMOGRAFIA",
+    precio: 350,
     descripcion: "Evaluación de hígado, vías biliares, páncreas, riñones, bazo, intestinos y estructuras pélvicas.",
     instrucciones: "Ayuno de 4 horas. Tomar agua o contraste oral según indicación médica.",
     validezDias: 30,
@@ -1448,6 +1492,7 @@ const examenes = [
   {
     nombre: "Resonancia Magnética de Cráneo (con y sin contraste)",
     tipo: "RESONANCIA",
+    precio: 450,
     descripcion: "Estudio de parénquima cerebral, silla turca, fosa posterior y nervios craneales con alta resolución.",
     instrucciones: "Retirar todos los objetos metálicos. Duración aproximada: 30–45 minutos. Informar implantes metálicos.",
     validezDias: 30,
@@ -1490,6 +1535,7 @@ const examenes = [
   {
     nombre: "Resonancia Magnética de Columna (Cervical / Dorsal / Lumbar)",
     tipo: "RESONANCIA",
+    precio: 450,
     descripcion: "Evaluación de médula espinal, discos intervertebrales, raíces nerviosas y estructuras paraespinales.",
     instrucciones: "Retirar objetos metálicos. Duración: 30–60 minutos.",
     validezDias: 30,
@@ -1524,6 +1570,7 @@ const examenes = [
   {
     nombre: "Resonancia Magnética de Rodilla",
     tipo: "RESONANCIA",
+    precio: 380,
     descripcion: "Evaluación de meniscos, ligamentos, cartílago articular y estructuras óseas de la articulación de rodilla.",
     instrucciones: "No requiere preparación especial. Informar prótesis o implantes metálicos.",
     validezDias: 30,
@@ -1571,6 +1618,7 @@ const examenes = [
   {
     nombre: "Electrocardiograma en Reposo (ECG de 12 Derivaciones)",
     tipo: "ELECTROCARDIOGRAMA",
+    precio: 40,
     descripcion: "Registro de la actividad eléctrica del corazón en 12 derivaciones estándar. Reposo absoluto durante el registro.",
     instrucciones: "Evitar cremas, lociones o aceites en el torso el día del examen. Reposo de 5 minutos previos.",
     validezDias: 14,
@@ -1606,6 +1654,7 @@ const examenes = [
   {
     nombre: "Monitoreo Holter 24 Horas",
     tipo: "ELECTROCARDIOGRAMA",
+    precio: 200,
     descripcion: "Registro continuo de ECG durante 24 horas para detección de arritmias intermitentes.",
     instrucciones: "No aplicar cremas ni lociones en el tórax. Llevar diario de actividades durante el monitoreo. No bañarse con el dispositivo.",
     validezDias: 14,
@@ -1644,6 +1693,7 @@ const examenes = [
   {
     nombre: "Glucosa Capilar (Glucómetro)",
     tipo: "OTRO",
+    precio: 10,
     descripcion: "Medición rápida de glucosa en sangre capilar para control glicémico en consulta.",
     instrucciones: "Informar si es en ayuno o postprandial. Limpiar el dedo antes de la punción.",
     validezDias: 1,

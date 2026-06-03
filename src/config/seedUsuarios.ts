@@ -63,26 +63,16 @@ interface CuentaMedica {
 }
 
 const CUENTAS_MEDICAS: CuentaMedica[] = [
-  { especialidad: "Pediatría",                        prefix: "pediatria",          password: "pediatria"          },
-  { especialidad: "Medicina Interna",                 prefix: "medicinainterna",     password: "medicinainterna"    },
-  { especialidad: "Ginecología",                      prefix: "ginecologia",         password: "ginecologia"        },
-  { especialidad: "Cardiología",                      prefix: "cardiologia",         password: "cardiologia"        },
-  { especialidad: "Oftalmología",                     prefix: "oftalmologia",        password: "oftalmologia"       },
-  { especialidad: "Medicina Física y Rehabilitación", prefix: "medicinafisica",      password: "medicinafisica"     },
-  { especialidad: "Neumología",                       prefix: "neumologia",          password: "neumologia"         },
-  { especialidad: "Reumatología",                     prefix: "reumatologia",        password: "reumatologia"       },
-  { especialidad: "Radiología",                       prefix: "radiologia",          password: "radiologia"         },
-  { especialidad: "Gastroenterología",                prefix: "gastroenterologia",   password: "gastroenterologia"  },
-  { especialidad: "Odontología",                      prefix: "odontologia",         password: "odontologia"        },
-  { especialidad: "Endocrinología",                   prefix: "endocrinologia",      password: "endocrinologia"     },
-  { especialidad: "Traumatología",                    prefix: "traumatologia",       password: "traumatologia"      },
-  { especialidad: "Geriatría",                        prefix: "geriatria",           password: "geriatria"          },
-  { especialidad: "Medicina",                         prefix: "medicina",            password: "medicina"           },
-  { especialidad: "Medicina Familiar",                prefix: "medicinafamiliar",    password: "medicinafamiliar"   },
-  { especialidad: "Ecografías",                       prefix: "ecografias",          password: "ecografias"         },
-  { especialidad: "Otorrinolaringología",             prefix: "otorrino",            password: "otorrino"           },
-  { especialidad: "Urología",                         prefix: "urologia",            password: "urologia"           },
-  { especialidad: "Cosmiatría",                       prefix: "cosmiatra",           password: "cosmiatra"          },
+  { especialidad: "Medicina General",          prefix: "medicinageneral",    password: "medicinageneral"   },
+  { especialidad: "Pediatría",                 prefix: "pediatria",          password: "pediatria"         },
+  { especialidad: "Odontología",               prefix: "odontologia",        password: "odontologia"       },
+  { especialidad: "Reumatología",              prefix: "reumatologia",       password: "reumatologia"      },
+  { especialidad: "Ginecología y Obstetricia", prefix: "ginecologia",        password: "ginecologia"       },
+  { especialidad: "Cardiología",               prefix: "cardiologia",        password: "cardiologia"       },
+  { especialidad: "Endocrinología",            prefix: "endocrinologia",     password: "endocrinologia"    },
+  { especialidad: "Neumología",                prefix: "neumologia",         password: "neumologia"        },
+  { especialidad: "Gastroenterología",         prefix: "gastroenterologia",  password: "gastroenterologia" },
+  { especialidad: "Psiquiatría",               prefix: "psiquiatria",        password: "psiquiatria"       },
 ];
 
 // ─── Main ──────────────────────────────────────────────────────────────────────

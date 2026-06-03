@@ -5,17 +5,16 @@ dotenv.config();
 import { Especialidad } from "../models/Especialidad";
 
 const especialidadesConConsultorios = [
-  { nombre: "Medicina", consultorio: 3 },
-  { nombre: "Medicina Interna", consultorio: 3 },
-  { nombre: "Pediatría", consultorio: 7 },
-  { nombre: "Odontología", consultorio: 1 },
-  { nombre: "Reumatología", consultorio: 9 },
-  { nombre: "Ginecología", consultorio: 5 },
-  { nombre: "Cardiología", consultorio: 2 },
-  { nombre: "Endocrinología", consultorio: 8 },
-  { nombre: "Neumología", consultorio: 4 },
-  { nombre: "Gastroenterología", consultorio: 6 },
-  { nombre: "Psiquiatría", consultorio: 10 },
+  { nombre: "Medicina General",          consultorio: 1  },
+  { nombre: "Pediatría",                 consultorio: 2  },
+  { nombre: "Odontología",               consultorio: 3  },
+  { nombre: "Reumatología",              consultorio: 4  },
+  { nombre: "Ginecología y Obstetricia", consultorio: 5  },
+  { nombre: "Cardiología",               consultorio: 6  },
+  { nombre: "Endocrinología",            consultorio: 7  },
+  { nombre: "Neumología",                consultorio: 8  },
+  { nombre: "Gastroenterología",         consultorio: 9  },
+  { nombre: "Psiquiatría",               consultorio: 10 },
 ];
 
 async function migrate() {

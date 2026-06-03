@@ -12,6 +12,7 @@
     "seed:ordenes": "ts-node src/config/seedOrdenes.ts",
     "seed:citas": "ts-node src/config/seedCitas.ts",
     "seed:usuarios": "ts-node src/config/seedUsuarios.ts",
+    "cleanup:especialidades": "ts-node src/config/cleanupEspecialidades.ts",
     "seed:paciente-demo": "ts-node src/config/seedPacienteDemo.ts",
     "seed:horarios": "ts-node src/config/seedHorarios.ts",
     "seed:cie10": "ts-node src/config/seedCIE10.ts",
