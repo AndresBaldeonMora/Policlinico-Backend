@@ -1,6 +1,7 @@
 import express from "express";
 import {
   crearPaciente,
+  crearCuentaPaciente,
   listarPacientes,
   obtenerPaciente,
   buscarPacientePorDni,
@@ -26,6 +27,7 @@ const PUEDE_CONSULTAR = ["ADMINISTRADOR", "RECEPCIONISTA", "MEDICO"];
 router.post("/",                                requireRole(STAFF_PADRON), crearPaciente);
 router.get("/",                                 requireRole(PUEDE_CONSULTAR), listarPacientes);
 router.get("/dni/:dni",                         requireRole(PUEDE_CONSULTAR), buscarPacientePorDni);
+router.post("/:id/crear-cuenta",               requireRole(STAFF_PADRON), crearCuentaPaciente);
 router.get("/:id/historial",                    requireRole(PUEDE_CONSULTAR), obtenerHistorial);
 router.patch("/:id/historial-clinico",          requireRole(["ADMINISTRADOR", "MEDICO"]), actualizarHistorialClinico);
 router.patch("/:id/historia-clinica-especialidad", requireRole(["ADMINISTRADOR", "MEDICO"]), actualizarHistoriaClinicaEspecialidad);
