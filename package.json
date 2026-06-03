@@ -18,6 +18,7 @@
     "seed:cie10": "ts-node src/config/seedCIE10.ts",
     "seed:dia-laboral": "ts-node src/config/seedDiaLaboral.ts",
     "seed:horario-todos": "ts-node src/config/seedHorarioTodos.ts",
+    "migrar:estados-vencidos": "ts-node src/config/migrarEstadosVencidos.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },

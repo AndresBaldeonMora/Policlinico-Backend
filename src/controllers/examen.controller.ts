@@ -415,7 +415,7 @@ export const registrarAsistencia = async (req: AuthRequest, res: Response) => {
 
     // Verificar que la orden no haya vencido
     if (orden.fechaVencimiento && new Date() > orden.fechaVencimiento) {
-      orden.estado = "VENCIDA";
+      orden.estado = "CANCELADA";
       orden.motivoVencimiento = "Expiró el período de vigencia sin que el paciente se presentara";
       await orden.save();
       return res.status(400).json({
@@ -615,7 +615,7 @@ export const obtenerDisponibilidadLab = async (req: Request, res: Response) => {
   }
 };
 
-// ── Procesar vencimiento automático — EN_PROCESO → VENCIDA ──
+// ── Procesar vencimiento automático — EN_PROCESO → CANCELADA (por vencimiento) ──
 // Se invoca desde el frontend al abrir el módulo. Actualiza en lote.
 export const procesarVencidas = async (req: Request, res: Response) => {
   try {
@@ -627,7 +627,7 @@ export const procesarVencidas = async (req: Request, res: Response) => {
       },
       {
         $set: {
-          estado: "VENCIDA",
+          estado: "CANCELADA",
           motivoVencimiento:
             "Expiró el período de vigencia sin que el paciente se presentara",
         },
@@ -654,7 +654,6 @@ export const listarOrdenesPorEstado = async (req: Request, res: Response) => {
       "ASISTIDO",
       "FINALIZADO",
       "CANCELADA",
-      "VENCIDA",
     ];
 
     const filtro: any =
@@ -689,7 +688,6 @@ export const listarOrdenesPendientes = async (req: Request, res: Response) => {
       "ASISTIDO",
       "FINALIZADO",
       "CANCELADA",
-      "VENCIDA",
     ];
 
     let filtro: any;

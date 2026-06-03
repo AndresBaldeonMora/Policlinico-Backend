@@ -142,8 +142,15 @@ export const reprogramarCita = async (req: Request, res: Response) => {
       });
     }
 
-    // Sólo PENDIENTE o REPROGRAMADA admiten reprogramación.
-    if (cita.estado !== "PENDIENTE" && cita.estado !== "REPROGRAMADA") {
+    // Regla de negocio: una cita sólo puede reprogramarse UNA vez. Una cita ya
+    // REPROGRAMADA no admite una segunda reprogramación; sólo PENDIENTE la admite.
+    if (cita.estado === "REPROGRAMADA") {
+      return res.status(409).json({
+        success: false,
+        message: "Esta cita ya fue reprogramada una vez y no admite una segunda reprogramación.",
+      });
+    }
+    if (cita.estado !== "PENDIENTE") {
       return res.status(409).json({
         success: false,
         message: `La cita en estado ${cita.estado} no admite reprogramación.`,
@@ -307,7 +314,9 @@ export const obtenerCitaPorId = async (req: Request, res: Response) => {
 // Estados terminales: ATENDIDA, CANCELADA.
 const CITA_TRANSICIONES: Record<string, string[]> = {
   PENDIENTE:    ["ASISTIO", "ATENDIDA", "CANCELADA", "REPROGRAMADA"],
-  REPROGRAMADA: ["ASISTIO", "ATENDIDA", "CANCELADA", "PENDIENTE"],
+  // No se permite REPROGRAMADA → PENDIENTE: revertiría la única reprogramación
+  // disponible y permitiría reprogramar una segunda vez.
+  REPROGRAMADA: ["ASISTIO", "ATENDIDA", "CANCELADA"],
   ASISTIO:      ["ATENDIDA", "CANCELADA"],
   // ATENDIDA / CANCELADA → terminales (no se permiten más mutaciones)
 };

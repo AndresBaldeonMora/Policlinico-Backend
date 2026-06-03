@@ -293,7 +293,7 @@ export const agendarCitaInterconsulta = async (req: AuthRequest, res: Response) 
     const conflictoMedico = await Cita.findOne({
       doctorId: new mongoose.Types.ObjectId(medicoId),
       fecha: fechaUTC, hora,
-      estado: { $nin: ["CANCELADA", "VENCIDA"] },
+      estado: { $nin: ["CANCELADA"] },
     });
     if (conflictoMedico) {
       return res.status(409).json({ success: false, message: "Ya tiene una cita agendada en esa fecha y hora" });
@@ -302,7 +302,7 @@ export const agendarCitaInterconsulta = async (req: AuthRequest, res: Response) 
     const conflictoPaciente = await Cita.findOne({
       pacienteId: interconsulta.pacienteId,
       fecha: fechaUTC, hora,
-      estado: { $nin: ["CANCELADA", "VENCIDA"] },
+      estado: { $nin: ["CANCELADA"] },
     });
     if (conflictoPaciente) {
       return res.status(409).json({ success: false, message: "El paciente ya tiene una cita programada a esa hora" });
@@ -383,7 +383,7 @@ export const agendarDesdeRecepcion = async (req: AuthRequest, res: Response) => 
     const conflictoMedico = await Cita.findOne({
       doctorId: new mongoose.Types.ObjectId(doctorId),
       fecha: fechaUTC, hora,
-      estado: { $nin: ["CANCELADA", "VENCIDA"] },
+      estado: { $nin: ["CANCELADA"] },
     });
     if (conflictoMedico) {
       return res.status(409).json({ success: false, message: "El doctor ya tiene una cita en esa fecha y hora" });
@@ -392,7 +392,7 @@ export const agendarDesdeRecepcion = async (req: AuthRequest, res: Response) => 
     const conflictoPaciente = await Cita.findOne({
       pacienteId: interconsulta.pacienteId,
       fecha: fechaUTC, hora,
-      estado: { $nin: ["CANCELADA", "VENCIDA"] },
+      estado: { $nin: ["CANCELADA"] },
     });
     if (conflictoPaciente) {
       return res.status(409).json({ success: false, message: "El paciente ya tiene otra cita a esa hora" });

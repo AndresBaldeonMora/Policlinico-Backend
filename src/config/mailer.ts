@@ -106,4 +106,31 @@ export const enviarCorreoReceta = async (correo: string, datos: DatosReceta) => 
   });
 };
 
+export const enviarCorreoRecordatorio = async (
+  correo: string,
+  paciente: { nombres: string; apellidos: string },
+  proxima?: { fecha?: string; hora?: string }
+) => {
+  const detalle = proxima?.fecha
+    ? `<p>Su próxima cita está programada para el <strong>${proxima.fecha}</strong>${proxima.hora ? ` a las <strong>${proxima.hora}</strong>` : ""}.</p>`
+    : "";
+
+  const html = `
+    <p>Estimado(a) <strong>${paciente.nombres} ${paciente.apellidos}</strong>,</p>
+    <p>Le recordamos que tiene una cita pendiente en el <strong>Policlínico Parroquial San José</strong>.</p>
+    ${detalle}
+    <p>Por favor, confirme su asistencia o comuníquese con nosotros si necesita reprogramar.</p>
+    <br>
+    <p>Atentamente,<br><strong>Policlínico Parroquial San José</strong></p>
+    <p style="color:#999;font-size:12px">Este es un correo automático, por favor no responda a este mensaje.</p>
+  `;
+
+  await transporter.sendMail({
+    from: `"Policlínico San José" <${process.env.SMTP_USER}>`,
+    to: correo,
+    subject: "Recordatorio de cita | Policlínico San José",
+    html,
+  });
+};
+
 export default transporter;

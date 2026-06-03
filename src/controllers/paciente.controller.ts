@@ -1,12 +1,14 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import axios from "axios";
 import { Paciente } from "../models/Paciente";
 import { Cita } from "../models/Cita";
 import { OrdenExamen } from "../models/OrdenExamen";
 import { Usuario } from "../models/Usuario";
 import { generarPasswordTemporal } from "../utils/generarPasswordTemporal";
 import { AuthRequest } from "../middlewares/authMiddlewares";
+import { enviarCorreoRecordatorio } from "../config/mailer";
 
 // ─── Validaciones ─────────────────────────────────────────
 const soloLetras    = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/;
@@ -422,5 +424,55 @@ export const eliminarPaciente = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Error al eliminar paciente:", error);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const enviarRecordatorioEmail = async (req: Request, res: Response) => {
+  try {
+    const paciente = await Paciente.findById(req.params.id).lean();
+    if (!paciente) return res.status(404).json({ success: false, message: "Paciente no encontrado" });
+    if (!paciente.correo) return res.status(400).json({ success: false, message: "El paciente no tiene correo registrado" });
+
+    await enviarCorreoRecordatorio(
+      paciente.correo,
+      { nombres: paciente.nombres, apellidos: paciente.apellidos },
+    );
+    res.json({ success: true, message: "Recordatorio enviado por correo" });
+  } catch (error: any) {
+    console.error("enviarRecordatorioEmail:", error);
+    res.status(500).json({ success: false, message: "Error al enviar el correo" });
+  }
+};
+
+export const enviarRecordatorioWsp = async (req: Request, res: Response) => {
+  try {
+    const paciente = await Paciente.findById(req.params.id).lean();
+    if (!paciente) return res.status(404).json({ success: false, message: "Paciente no encontrado" });
+    if (!paciente.telefono) return res.status(400).json({ success: false, message: "El paciente no tiene teléfono registrado" });
+
+    const token   = process.env.WHATSAPP_TOKEN;
+    const phoneId = process.env.WHATSAPP_PHONE_ID;
+    if (!token || !phoneId) {
+      return res.status(503).json({ success: false, message: "WhatsApp no configurado en el servidor" });
+    }
+
+    const numero = `51${paciente.telefono.replace(/\D/g, "")}`;
+    const mensaje = `Hola ${paciente.nombres}, le recordamos que tiene una cita pendiente en el Policlínico Parroquial San José. Por favor confirme su asistencia o comuníquese con nosotros si necesita reprogramar.`;
+
+    await axios.post(
+      `https://graph.facebook.com/v19.0/${phoneId}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to: numero,
+        type: "text",
+        text: { body: mensaje },
+      },
+      { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+    );
+
+    res.json({ success: true, message: "Recordatorio enviado por WhatsApp" });
+  } catch (error: any) {
+    console.error("enviarRecordatorioWsp:", error?.response?.data ?? error.message);
+    res.status(500).json({ success: false, message: "Error al enviar el mensaje de WhatsApp" });
   }
 };

@@ -8,7 +8,9 @@ export interface ICita extends Document {
   fecha: Date;
   hora?: string;
   tipo: TipoCita;
-  estado: "PENDIENTE" | "ASISTIO" | "ATENDIDA" | "CANCELADA" | "REPROGRAMADA" | "VENCIDA";
+  // VENCIDA se eliminó como estado: las citas que expiran (por tiempo o manual)
+  // terminan en CANCELADA, con el motivo registrado en `motivoCancelacion`.
+  estado: "PENDIENTE" | "ASISTIO" | "ATENDIDA" | "CANCELADA" | "REPROGRAMADA";
 
   // Vínculo cuando la cita nace como respuesta presencial a una interconsulta
   interconsultaId?: mongoose.Types.ObjectId;
@@ -126,7 +128,7 @@ const citaSchema = new Schema<ICita>(
 
     estado: {
       type: String,
-      enum: ["PENDIENTE","ASISTIO", "ATENDIDA", "CANCELADA", "REPROGRAMADA", "VENCIDA"],
+      enum: ["PENDIENTE", "ASISTIO", "ATENDIDA", "CANCELADA", "REPROGRAMADA"],
       default: "PENDIENTE",
       required: true,
     },
@@ -225,7 +227,7 @@ citaSchema.index({ estado: 1, fecha: 1 });
 citaSchema.index({ interconsultaId: 1 });
 
 // Estados que mantienen un horario OCUPADO. Una cita en cualquier otro
-// estado (CANCELADA, VENCIDA, REPROGRAMADA, ATENDIDA) libera el slot.
+// estado (CANCELADA, REPROGRAMADA, ATENDIDA) libera el slot.
 export const ESTADOS_OCUPAN_SLOT = ["PENDIENTE", "ASISTIO"];
 
 export const Cita = mongoose.model<ICita>("Cita", citaSchema);

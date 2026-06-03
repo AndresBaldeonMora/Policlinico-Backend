@@ -10,6 +10,8 @@ import {
   obtenerHistorial,
   actualizarHistorialClinico,
   actualizarHistoriaClinicaEspecialidad,
+  enviarRecordatorioEmail,
+  enviarRecordatorioWsp,
 } from "../controllers/paciente.controller";
 import { verifyToken, requireRole } from "../middlewares/authMiddlewares";
 
@@ -34,5 +36,7 @@ router.patch("/:id/historia-clinica-especialidad", requireRole(["ADMINISTRADOR",
 router.get("/:id",                              requireRole(PUEDE_CONSULTAR), obtenerPaciente);
 router.put("/:id",                              requireRole(STAFF_PADRON), actualizarPaciente);
 router.delete("/:id",                           requireRole(["ADMINISTRADOR"]), eliminarPaciente);
+router.post("/:id/recordatorio-email",          requireRole(PUEDE_CONSULTAR), enviarRecordatorioEmail);
+router.post("/:id/recordatorio-wsp",            requireRole(PUEDE_CONSULTAR), enviarRecordatorioWsp);
 
 export default router;

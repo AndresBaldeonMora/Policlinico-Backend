@@ -19,13 +19,15 @@ export interface IItemOrden {
   estadoItem: "PENDIENTE" | "COMPLETADO";
 }
 
+// VENCIDA se eliminó: las órdenes que expiran terminan en CANCELADA (motivo en
+// `motivoVencimiento`). Las órdenes no se reprograman: el paciente debe sacar
+// nueva cita y que el médico emita una orden nueva.
 export type EstadoOrdenExamen =
   | "PENDIENTE"
   | "EN_PROCESO"
   | "ASISTIDO"
   | "FINALIZADO"
-  | "CANCELADA"
-  | "VENCIDA";
+  | "CANCELADA";
 
 export type TipoOrden = "LABORATORIO" | "IMAGEN" | "MIXTA";
 
@@ -128,7 +130,7 @@ const ordenExamenSchema = new Schema<IOrdenExamen>(
     items: [itemOrdenSchema],
     estado: {
       type: String,
-      enum: ["PENDIENTE", "EN_PROCESO", "ASISTIDO", "FINALIZADO", "CANCELADA", "VENCIDA"],
+      enum: ["PENDIENTE", "EN_PROCESO", "ASISTIDO", "FINALIZADO", "CANCELADA"],
       default: "PENDIENTE",
       required: true,
     },

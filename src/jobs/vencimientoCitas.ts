@@ -3,9 +3,11 @@ import { AuditLog } from "../models/AuditLog";
 import { hoyPeruUTC, horaPeruAInstanteUTC } from "../utils/fecha.utils";
 
 /**
- * Marca como VENCIDAS:
+ * Cancela automáticamente (estado CANCELADA, con motivo de vencimiento):
  *  - Citas PENDIENTE/REPROGRAMADA cuya hora superó 30 min sin asistencia (hoy o antes).
  *  - Citas ASISTIO de días anteriores: el paciente llegó pero no fue atendido.
+ * El motivo queda en `motivoCancelacion` para diferenciarlas en reportes de las
+ * cancelaciones manuales.
  */
 export const verificarCitasVencidas = async (): Promise<number> => {
   const ahora = new Date();
@@ -47,7 +49,7 @@ export const verificarCitasVencidas = async (): Promise<number> => {
       motivo = "Paciente no asistió 30 minutos después de la hora programada.";
     }
 
-    cita.estado = "VENCIDA";
+    cita.estado = "CANCELADA";
     cita.motivoCancelacion = motivo;
     await cita.save();
     vencidas++;
@@ -59,8 +61,8 @@ export const verificarCitasVencidas = async (): Promise<number> => {
         entidad: "Cita",
         entidadId: cita._id,
         estadoAnterior,
-        estadoNuevo: "VENCIDA",
-        descripcion: `Cita de ${estadoAnterior} a VENCIDA automáticamente (fecha: ${cita.fecha.toISOString().split("T")[0]}, hora: ${cita.hora ?? "sin hora"})`,
+        estadoNuevo: "CANCELADA",
+        descripcion: `Cita de ${estadoAnterior} a CANCELADA por vencimiento (fecha: ${cita.fecha.toISOString().split("T")[0]}, hora: ${cita.hora ?? "sin hora"})`,
       });
     } catch (err) {
       console.error("Error al registrar audit de vencimiento de cita:", err);
@@ -68,7 +70,7 @@ export const verificarCitasVencidas = async (): Promise<number> => {
   }
 
   if (vencidas > 0)
-    console.log(`⏰ ${vencidas} cita(s) marcada(s) como VENCIDA(s) automáticamente`);
+    console.log(`⏰ ${vencidas} cita(s) CANCELADA(s) por vencimiento automáticamente`);
 
   return vencidas;
 };
