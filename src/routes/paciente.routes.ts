@@ -7,6 +7,9 @@ import {
   buscarPacientePorDni,
   actualizarPaciente,
   eliminarPaciente,
+  desactivarPaciente,
+  subirAvatarPaciente,
+  uploadAvatarPaciente,
   obtenerHistorial,
   actualizarHistorialClinico,
   actualizarHistoriaClinicaEspecialidad,
@@ -36,6 +39,8 @@ router.patch("/:id/historia-clinica-especialidad", requireRole(["ADMINISTRADOR",
 router.get("/:id",                                 requireRole(PUEDE_CONSULTAR), obtenerPaciente);
 router.put("/:id",                                 requireRole(STAFF_PADRON), actualizarPaciente);
 router.delete("/:id",                              requireRole(["ADMINISTRADOR"]), eliminarPaciente);
+router.patch("/:id/desactivar",                    requireRole(["ADMINISTRADOR", "RECEPCIONISTA"]), desactivarPaciente);
+router.post("/:id/avatar",                         requireRole(PUEDE_CONSULTAR), uploadAvatarPaciente, subirAvatarPaciente);
 router.post("/:id/recordatorio-email",             requireRole(PUEDE_CONSULTAR), enviarRecordatorioEmail);
 router.post("/:id/recordatorio-wsp",               requireRole(PUEDE_CONSULTAR), enviarRecordatorioWsp);
 

@@ -8,6 +8,7 @@ export interface IDoctor extends Document {
   telefono: string;
   especialidadId: mongoose.Types.ObjectId;
   cmp?: string;
+  avatar?: string;
 }
 
 const doctorSchema = new Schema<IDoctor>(
@@ -39,6 +40,7 @@ const doctorSchema = new Schema<IDoctor>(
         message: "CMP debe contener 4 a 8 dígitos",
       },
     },
+    avatar: { type: String, default: null },
   },
   { timestamps: true }
 );

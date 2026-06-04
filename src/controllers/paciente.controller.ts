@@ -2,6 +2,9 @@ import { Request, Response } from "express";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import axios from "axios";
+import path from "path";
+import fs from "fs/promises";
+import multer from "multer";
 import { Paciente } from "../models/Paciente";
 import { Cita } from "../models/Cita";
 import { OrdenExamen } from "../models/OrdenExamen";
@@ -436,15 +439,98 @@ export const eliminarPaciente = async (req: Request, res: Response) => {
   }
 };
 
+// ── Desactivar paciente (soft-delete) ──────────────────────────
+export const desactivarPaciente = async (req: Request, res: Response) => {
+  try {
+    const paciente = await Paciente.findByIdAndUpdate(
+      req.params.id,
+      { activo: false },
+      { new: true }
+    );
+    if (!paciente)
+      return res.status(404).json({ success: false, message: "Paciente no encontrado" });
+    res.json({ success: true, message: "Paciente desactivado correctamente" });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── Subir/actualizar avatar del paciente (staff) ───────────────
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+const AVATAR_DIR_STAFF = path.resolve(process.cwd(), "uploads", "avatares");
+
+export const uploadAvatarPaciente = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: AVATAR_MAX_BYTES },
+}).single("avatar");
+
+const detectImageExt = (buf: Buffer): "jpg" | "png" | "webp" | null => {
+  if (buf.length < 12) return null;
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "jpg";
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return "png";
+  if (buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP") return "webp";
+  return null;
+};
+
+export const subirAvatarPaciente = async (req: Request, res: Response) => {
+  try {
+    const file = (req as any).file as Express.Multer.File | undefined;
+    if (!file)
+      return res.status(400).json({ success: false, message: "No se recibió ningún archivo en el campo 'avatar'" });
+    if (file.size > AVATAR_MAX_BYTES)
+      return res.status(400).json({ success: false, message: "El avatar excede el tamaño máximo de 2MB" });
+
+    const ext = detectImageExt(file.buffer);
+    if (!ext)
+      return res.status(400).json({ success: false, message: "Tipo de archivo no permitido. Solo JPG, PNG o WebP" });
+
+    await fs.mkdir(AVATAR_DIR_STAFF, { recursive: true });
+
+    const baseName = String(req.params.id);
+    for (const otraExt of ["jpg", "jpeg", "png", "webp"]) {
+      if (otraExt === ext) continue;
+      await fs.rm(path.join(AVATAR_DIR_STAFF, `${baseName}.${otraExt}`), { force: true });
+    }
+
+    const fileName = `${baseName}.${ext}`;
+    await fs.writeFile(path.join(AVATAR_DIR_STAFF, fileName), file.buffer);
+
+    const avatarUrl = `/uploads/avatares/${fileName}`;
+    await Paciente.findByIdAndUpdate(req.params.id, { avatar: avatarUrl });
+
+    res.json({ success: true, message: "Avatar actualizado", data: { avatarUrl } });
+  } catch (error: any) {
+    if (error?.code === "LIMIT_FILE_SIZE")
+      return res.status(400).json({ success: false, message: "El avatar excede el tamaño máximo de 2MB" });
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export const enviarRecordatorioEmail = async (req: Request, res: Response) => {
   try {
     const paciente = await Paciente.findById(req.params.id).lean();
     if (!paciente) return res.status(404).json({ success: false, message: "Paciente no encontrado" });
     if (!paciente.correo) return res.status(400).json({ success: false, message: "El paciente no tiene correo registrado" });
 
+    const citasDocs = await Cita.find({ pacienteId: paciente._id })
+      .sort({ fecha: 1 })
+      .populate<{ doctorId: { nombres: string; apellidos: string } | null }>(
+        "doctorId", "nombres apellidos"
+      )
+      .lean();
+
+    const citas = citasDocs.map((c) => ({
+      fecha:  c.fecha.toISOString(),
+      hora:   c.hora ?? undefined,
+      tipo:   c.tipo,
+      estado: c.estado,
+      doctor: c.doctorId ? `${c.doctorId.nombres} ${c.doctorId.apellidos}` : undefined,
+    }));
+
     await enviarCorreoRecordatorio(
       paciente.correo,
-      { nombres: paciente.nombres, apellidos: paciente.apellidos },
+      { nombres: paciente.nombres, apellidos: paciente.apellidos, dni: paciente.dni },
+      citas,
     );
     res.json({ success: true, message: "Recordatorio enviado por correo" });
   } catch (error: any) {

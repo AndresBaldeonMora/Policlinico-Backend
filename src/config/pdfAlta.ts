@@ -245,7 +245,9 @@ export const generarPDFAlta = (datos: DatosAlta): Promise<Buffer> => {
     }
 
     // ── Footer ────────────────────────────────────────────────────
-    const footY = doc.page.height - 60;
+    // footY debe ser tal que footY + 20 <= page.height - margin(50) = 791.89
+    // Usamos page.height - 80 → footY ≈ 761, footY+20 ≈ 781 (dentro del área útil)
+    const footY = doc.page.height - 80;
     doc
       .moveTo(left, footY).lineTo(left + pageW, footY)
       .strokeColor(border).lineWidth(0.5).stroke();

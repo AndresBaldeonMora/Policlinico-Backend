@@ -1,5 +1,8 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
+import path from "path";
+import fs from "fs/promises";
+import multer from "multer";
 import { Cita, ICita } from "../models/Cita";
 import { Doctor } from "../models/Doctor";
 import { Horario } from "../models/Horario";
@@ -614,6 +617,59 @@ export const generarAlta = async (req: Request, res: Response) => {
     res.send(pdf);
   } catch (error: any) {
     console.error("ERROR en generarAlta:", error.message, error.stack);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── Avatar del médico ─────────────────────────────────────────
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+const AVATAR_DIR_DOC   = path.resolve(process.cwd(), "uploads", "avatares");
+
+export const uploadAvatarMedico = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: AVATAR_MAX_BYTES },
+}).single("avatar");
+
+const detectImgExt = (buf: Buffer): "jpg" | "png" | "webp" | null => {
+  if (buf.length < 12) return null;
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "jpg";
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return "png";
+  if (buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP") return "webp";
+  return null;
+};
+
+export const subirAvatarMedico = async (req: AuthRequest, res: Response) => {
+  try {
+    const doctorId = getDoctorId(req);
+    if (!doctorId) return res.status(403).json({ success: false, message: "No autorizado" });
+
+    const file = (req as any).file as Express.Multer.File | undefined;
+    if (!file)
+      return res.status(400).json({ success: false, message: "No se recibió ningún archivo en el campo 'avatar'" });
+    if (file.size > AVATAR_MAX_BYTES)
+      return res.status(400).json({ success: false, message: "El avatar excede el tamaño máximo de 2MB" });
+
+    const ext = detectImgExt(file.buffer);
+    if (!ext)
+      return res.status(400).json({ success: false, message: "Solo se aceptan JPG, PNG o WebP" });
+
+    await fs.mkdir(AVATAR_DIR_DOC, { recursive: true });
+
+    for (const otraExt of ["jpg", "jpeg", "png", "webp"]) {
+      if (otraExt === ext) continue;
+      await fs.rm(path.join(AVATAR_DIR_DOC, `doc_${doctorId}.${otraExt}`), { force: true });
+    }
+
+    const fileName = `doc_${doctorId}.${ext}`;
+    await fs.writeFile(path.join(AVATAR_DIR_DOC, fileName), file.buffer);
+
+    const avatarUrl = `/uploads/avatares/${fileName}`;
+    await Doctor.findByIdAndUpdate(doctorId, { avatar: avatarUrl });
+
+    res.json({ success: true, message: "Foto actualizada", data: { avatarUrl } });
+  } catch (error: any) {
+    if (error?.code === "LIMIT_FILE_SIZE")
+      return res.status(400).json({ success: false, message: "El avatar excede el tamaño máximo de 2MB" });
     res.status(500).json({ success: false, message: error.message });
   }
 };

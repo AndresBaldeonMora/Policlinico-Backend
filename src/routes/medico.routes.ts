@@ -12,6 +12,8 @@ import {
   generarAlta,
   obtenerHistorialCitasPaciente,
   obtenerResultadosRecientes,
+  subirAvatarMedico,
+  uploadAvatarMedico,
 } from "../controllers/medico.controller";
 import { verifyToken, requireRole } from "../middlewares/authMiddlewares";
 
@@ -23,6 +25,7 @@ router.use(requireRole(["MEDICO"]));
 
 // Perfil del médico
 router.get("/perfil", obtenerMiPerfil);
+router.post("/perfil/avatar", uploadAvatarMedico, subirAvatarMedico);
 
 // Citas
 router.get("/citas", obtenerMisCitas);

@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { generarPDFResultados } from "./pdfResultados";
 import { generarPDFReceta, DatosReceta } from "./pdfReceta";
+import { generarPDFRecordatorio, CitaResumen } from "./pdfRecordatorio";
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -176,17 +177,21 @@ export const enviarCorreoReclamacion = async (datos: DatosCorreoReclamacion) => 
 
 export const enviarCorreoRecordatorio = async (
   correo: string,
-  paciente: { nombres: string; apellidos: string },
-  proxima?: { fecha?: string; hora?: string }
+  paciente: { nombres: string; apellidos: string; dni: string },
+  citas: CitaResumen[]
 ) => {
-  const detalle = proxima?.fecha
-    ? `<p>Su próxima cita está programada para el <strong>${proxima.fecha}</strong>${proxima.hora ? ` a las <strong>${proxima.hora}</strong>` : ""}.</p>`
+  const proximas = citas.filter((c) => c.estado === "PENDIENTE");
+  const detalleProxima = proximas.length > 0
+    ? `<p>Su próxima cita está programada para el <strong>${new Date(proximas[0].fecha).toLocaleDateString("es-PE", { timeZone: "UTC" })}</strong>${proximas[0].hora ? ` a las <strong>${proximas[0].hora}</strong>` : ""}.</p>`
     : "";
+
+  const pdfBuffer = await generarPDFRecordatorio({ paciente, citas });
 
   const html = `
     <p>Estimado(a) <strong>${paciente.nombres} ${paciente.apellidos}</strong>,</p>
-    <p>Le recordamos que tiene una cita pendiente en el <strong>Policlínico Parroquial San José</strong>.</p>
-    ${detalle}
+    <p>Le recordamos que tiene citas registradas en el <strong>Policlínico Parroquial San José</strong>.</p>
+    ${detalleProxima}
+    <p>Encontrará el detalle completo de sus citas en el archivo PDF adjunto.</p>
     <p>Por favor, confirme su asistencia o comuníquese con nosotros si necesita reprogramar.</p>
     <br>
     <p>Atentamente,<br><strong>Policlínico Parroquial San José</strong></p>
@@ -196,8 +201,11 @@ export const enviarCorreoRecordatorio = async (
   await transporter.sendMail({
     from: `"Policlínico San José" <${process.env.SMTP_USER}>`,
     to: correo,
-    subject: "Recordatorio de cita | Policlínico San José",
+    subject: "Recordatorio de citas | Policlínico San José",
     html,
+    attachments: [
+      { filename: `Recordatorio_Citas_${paciente.dni}.pdf`, content: pdfBuffer, contentType: "application/pdf" },
+    ],
   });
 };
 

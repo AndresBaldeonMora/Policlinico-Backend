@@ -48,6 +48,7 @@ export interface IPaciente extends Document {
   apoderadoParentesco?: string;
   apoderadoTelefono?: string;
   avatar?: string;
+  activo?: boolean;
   alergias: IAlergia[];
   medicamentosHabituales: IMedicamentoHabitual[];
   problemasMedicos: IProblemaMedico[];
@@ -97,6 +98,7 @@ const pacienteSchema = new Schema<IPaciente>(
     apoderadoParentesco:  { type: String, trim: true, default: "" },
     apoderadoTelefono:    { type: String, trim: true, default: "" },
     avatar:               { type: String, default: null },
+    activo:               { type: Boolean, default: true },
     alergias: {
       type: [{
         sustancia: { type: String, trim: true, required: true, maxlength: 120 },
