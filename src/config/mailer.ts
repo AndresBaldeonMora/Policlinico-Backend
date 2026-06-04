@@ -64,7 +64,6 @@ export const enviarCorreoResultados = async (datos: DatosCorreoResultados) => {
     }
   }
 
-  // Mensaje simple
   const html = `
     <p>Estimado(a) <strong>${paciente.nombres} ${paciente.apellidos}</strong>,</p>
     <p>Sus resultados de laboratorio / imagen de la orden <strong>${codigoOrden}</strong> están listos.</p>
@@ -129,6 +128,49 @@ export const enviarCorreoAlta = async (
     attachments: [
       { filename: "Resumen_Atencion.pdf", content: pdfBuffer, contentType: "application/pdf" },
     ],
+  });
+};
+
+interface DatosCorreoReclamacion {
+  correo: string;
+  paciente: { nombres: string; apellidos: string; dni: string };
+  tipo: "QUEJA" | "RECLAMO";
+  descripcion: string;
+  fecha: Date;
+  codigoReclamacion: string;
+}
+
+export const enviarCorreoReclamacion = async (datos: DatosCorreoReclamacion) => {
+  const { correo, paciente, tipo, descripcion, fecha, codigoReclamacion } = datos;
+  const fechaStr = fecha.toLocaleString("es-PE", { timeZone: "America/Lima" });
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+      <h2 style="color: #0f172a; border-bottom: 2px solid #3b82f6; padding-bottom: 10px;">Confirmación de Libro de Reclamaciones Virtual</h2>
+      <p>Estimado(a) <strong>${paciente.nombres} ${paciente.apellidos}</strong>,</p>
+      <p>Confirmamos que hemos recibido su registro en nuestro Libro de Reclamaciones Virtual.</p>
+
+      <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+        <p style="margin: 5px 0;"><strong>Código de Registro:</strong> ${codigoReclamacion}</p>
+        <p style="margin: 5px 0;"><strong>Tipo:</strong> ${tipo === "QUEJA" ? "Queja" : "Reclamo"}</p>
+        <p style="margin: 5px 0;"><strong>Fecha de Registro:</strong> ${fechaStr}</p>
+        <p style="margin: 5px 0;"><strong>Descripción:</strong></p>
+        <p style="margin: 5px 0; white-space: pre-wrap; color: #334155; font-style: italic;">"${descripcion}"</p>
+      </div>
+
+      <p>De acuerdo con la normativa del Código de Protección al Consumidor (Ley 29571), procederemos a evaluar y dar respuesta a su requerimiento en el plazo legal correspondiente.</p>
+
+      <br>
+      <p>Atentamente,<br><strong>Policlínico Parroquial San José</strong></p>
+      <p style="color:#999;font-size:12px;margin-top:20px;border-top:1px solid #e2e8f0;padding-top:10px;">Este es un correo automático, por favor no responda a este mensaje.</p>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"Policlínico San José" <${process.env.SMTP_USER}>`,
+    to: correo,
+    subject: `Confirmación de Libro de Reclamaciones — ${codigoReclamacion} | Policlínico San José`,
+    html,
   });
 };
 
