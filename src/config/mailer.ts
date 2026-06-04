@@ -106,6 +106,32 @@ export const enviarCorreoReceta = async (correo: string, datos: DatosReceta) => 
   });
 };
 
+export const enviarCorreoAlta = async (
+  correo: string,
+  paciente: { nombres: string; apellidos: string },
+  pdfBuffer: Buffer
+) => {
+  const html = `
+    <p>Estimado(a) <strong>${paciente.nombres} ${paciente.apellidos}</strong>,</p>
+    <p>Gracias por atenderse en el <strong>Policlínico Parroquial San José</strong>. Esperamos que se encuentre bien.</p>
+    <p>Adjunto encontrará el resumen de su atención médica, el cual incluye los diagnósticos, indicaciones, medicamentos prescritos y recomendaciones de seguimiento emitidos durante su consulta.</p>
+    <p>Le recordamos guardar este documento para futuras referencias o consultas con otros profesionales de salud.</p>
+    <br>
+    <p>Atentamente,<br><strong>Policlínico Parroquial San José</strong></p>
+    <p style="color:#999;font-size:12px">Este es un correo automático, por favor no responda a este mensaje.</p>
+  `;
+
+  await transporter.sendMail({
+    from: `"Policlínico San José" <${process.env.SMTP_USER}>`,
+    to: correo,
+    subject: "Resumen de su atención médica | Policlínico San José",
+    html,
+    attachments: [
+      { filename: "Resumen_Atencion.pdf", content: pdfBuffer, contentType: "application/pdf" },
+    ],
+  });
+};
+
 export const enviarCorreoRecordatorio = async (
   correo: string,
   paciente: { nombres: string; apellidos: string },

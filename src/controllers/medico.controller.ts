@@ -8,9 +8,8 @@ import { Interconsulta } from "../models/Interconsulta";
 import { AuthRequest } from "../middlewares/authMiddlewares";
 import { generarPDFReceta } from "../config/pdfReceta";
 import { generarPDFAlta } from "../config/pdfAlta";
-import { enviarCorreoReceta } from "../config/mailer";
+import { enviarCorreoAlta } from "../config/mailer";
 import { hoyPeruUTC } from "../utils/fecha.utils";
-import cloudinary from "../config/cloudinary";
 
 const getDoctorId = (req: Request): string | null => {
   const user = (req as AuthRequest).user;
@@ -470,14 +469,6 @@ export const generarReceta = async (req: Request, res: Response) => {
 
     const pdf = await generarPDFReceta(datosReceta);
 
-    // Enviar copia al correo del paciente si tiene uno registrado (sin bloquear la respuesta)
-    const correo = pac?.correo;
-    if (correo) {
-      enviarCorreoReceta(correo, datosReceta).catch((err) =>
-        console.error("Error enviando receta por correo:", err)
-      );
-    }
-
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="Receta_${String(cita._id).slice(-6)}.pdf"`);
     res.send(pdf);
@@ -539,7 +530,7 @@ export const generarAlta = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     const cita = await Cita.findById(id)
-      .populate("pacienteId", "nombres apellidos dni fechaNacimiento")
+      .populate("pacienteId", "nombres apellidos dni fechaNacimiento correo")
       .populate({
         path: "doctorId",
         select: "nombres apellidos cmp especialidadId",
@@ -607,25 +598,15 @@ export const generarAlta = async (req: Request, res: Response) => {
       proximaCita,
       tiempoSeguimiento,
     };
-    console.log("datosAlta construido:", JSON.stringify(datosAlta, null, 2));
     const pdf = await generarPDFAlta(datosAlta);
-    console.log("PDF generado, tamaño:", pdf.length);
-    // Subir a Cloudinary
-    const publicId = `alta_${String(cita._id)}_${Date.now()}.pdf`;
-    const b64DataUri = `data:application/pdf;base64,${pdf.toString("base64")}`;
-    console.log("Subiendo a Cloudinary...");
-    const uploadResult = await cloudinary.uploader.upload(b64DataUri, {
-      resource_type: "raw",
-      folder: "policlinico/altas",
-      public_id: publicId , 
-      overwrite: true,
-    });uploadResult
 
-    // Guardar URL en la cita
-    await Cita.findByIdAndUpdate(cita._id, {
-      altaMedicaUrl: uploadResult.secure_url,
-      altaMedicaPublicId: uploadResult.public_id,
-    });
+    // Enviar resumen de atención al correo del paciente (sin bloquear la respuesta)
+    const correo = pac?.correo;
+    if (correo) {
+      enviarCorreoAlta(correo, pac, pdf).catch((err) =>
+        console.error("Error enviando resumen de alta por correo:", err)
+      );
+    }
 
     // Devolver el PDF al frontend
     res.setHeader("Content-Type", "application/pdf");
