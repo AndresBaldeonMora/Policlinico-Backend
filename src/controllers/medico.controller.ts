@@ -7,8 +7,10 @@ import { OrdenExamen } from "../models/OrdenExamen";
 import { Interconsulta } from "../models/Interconsulta";
 import { AuthRequest } from "../middlewares/authMiddlewares";
 import { generarPDFReceta } from "../config/pdfReceta";
+import { generarPDFAlta } from "../config/pdfAlta";
 import { enviarCorreoReceta } from "../config/mailer";
 import { hoyPeruUTC } from "../utils/fecha.utils";
+import cloudinary from "../config/cloudinary";
 
 const getDoctorId = (req: Request): string | null => {
   const user = (req as AuthRequest).user;
@@ -529,5 +531,108 @@ export const obtenerHistorialCitasPaciente = async (req: Request, res: Response)
   } catch (error: any) {
     console.error("obtenerHistorialCitasPaciente:", error);
     res.status(500).json({ success: false, message: "Error al obtener historial" });
+  }
+};
+
+export const generarAlta = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const cita = await Cita.findById(id)
+      .populate("pacienteId", "nombres apellidos dni fechaNacimiento")
+      .populate({
+        path: "doctorId",
+        select: "nombres apellidos cmp especialidadId",
+        populate: { path: "especialidadId", select: "nombre" },
+      });
+
+    if (!cita) {
+      return res.status(404).json({ success: false, message: "Cita no encontrada" });
+    }
+
+    const pac: any = cita.pacienteId;
+    const doc: any = cita.doctorId;
+
+    // Extraer medidas no farmacológicas y próxima cita del SOAP guardado
+    let indicaciones: string[] = [];
+    let otrasIndicaciones: string | undefined;
+    let criteriosAlarma: string | undefined;
+    let proximaCita: string | undefined;
+    let tiempoSeguimiento: string | undefined;
+    let hora: string | undefined = cita.hora;
+
+    if (cita.notasClinicas) {
+      try {
+        const parsed = JSON.parse(cita.notasClinicas);
+        indicaciones       = parsed.soap?.P?.medidas            ?? [];
+        otrasIndicaciones  = parsed.soap?.P?.otrasIndicaciones  || undefined;
+        criteriosAlarma    = parsed.soap?.P?.criteriosAlarma    || undefined;
+        proximaCita        = parsed.soap?.P?.proximaCita        || undefined;
+        tiempoSeguimiento  = parsed.soap?.P?.tiempoSeguimiento  || undefined;
+      } catch { /* SOAP no parseable, continuar con vacíos */ }
+    }
+
+    const datosAlta = {
+      fecha:    (cita.fecha ?? new Date()).toISOString(),
+      hora,
+      paciente: {
+        nombres:         pac?.nombres       ?? "",
+        apellidos:       pac?.apellidos     ?? "",
+        dni:             pac?.dni           ?? "",
+        fechaNacimiento: pac?.fechaNacimiento
+          ? new Date(pac.fechaNacimiento).toISOString()
+          : undefined,
+      },
+      doctor: {
+        nombres:   doc?.nombres   ?? cita.firma?.medicoNombre ?? "",
+        apellidos: doc?.apellidos ?? "",
+        cmp:       doc?.cmp       ?? cita.firma?.numeroCMP    ?? "",
+      },
+      especialidad: doc?.especialidadId?.nombre ?? cita.especialidad?.nombre ?? "",
+      diagnosticos: (cita.diagnosticos ?? []).map((d) => ({
+        codigo:      d.codigo,
+        descripcion: d.descripcion,
+        tipo:        d.tipo,
+      })),
+      medicamentos: (cita.medicamentosPrescritos ?? []).map((m) => ({
+        nombre:        m.nombre,
+        concentracion: m.concentracion,
+        frecuencia:    m.frecuencia,
+        duracion:      m.duracion,
+        dosis:         m.dosis,
+      })),
+      indicaciones,
+      otrasIndicaciones,
+      criteriosAlarma,
+      proximaCita,
+      tiempoSeguimiento,
+    };
+    console.log("datosAlta construido:", JSON.stringify(datosAlta, null, 2));
+    const pdf = await generarPDFAlta(datosAlta);
+    console.log("PDF generado, tamaño:", pdf.length);
+    // Subir a Cloudinary
+    const publicId = `alta_${String(cita._id)}_${Date.now()}.pdf`;
+    const b64DataUri = `data:application/pdf;base64,${pdf.toString("base64")}`;
+    console.log("Subiendo a Cloudinary...");
+    const uploadResult = await cloudinary.uploader.upload(b64DataUri, {
+      resource_type: "raw",
+      folder: "policlinico/altas",
+      public_id: publicId , 
+      overwrite: true,
+    });uploadResult
+
+    // Guardar URL en la cita
+    await Cita.findByIdAndUpdate(cita._id, {
+      altaMedicaUrl: uploadResult.secure_url,
+      altaMedicaPublicId: uploadResult.public_id,
+    });
+
+    // Devolver el PDF al frontend
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="Alta_${String(cita._id).slice(-6)}.pdf"`);
+    res.send(pdf);
+  } catch (error: any) {
+    console.error("ERROR en generarAlta:", error.message, error.stack);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
