@@ -248,6 +248,15 @@ export const actualizarPaciente = async (req: Request, res: Response) => {
       req.params.id, whitelistPaciente(req.body), { new: true, runValidators: true }
     );
     if (!paciente) return res.status(404).json({ success: false, message: "Paciente no encontrado" });
+
+    // Sincronizar correo en Usuario vinculado para que el login siga funcionando
+    if (correo?.trim()) {
+      await Usuario.findOneAndUpdate(
+        { pacienteId: req.params.id },
+        { correo: correo.trim().toLowerCase() }
+      );
+    }
+
     res.json({ success: true, message: "Paciente actualizado correctamente", data: paciente });
   } catch (error: any) {
     console.error("actualizarPaciente:", error);
