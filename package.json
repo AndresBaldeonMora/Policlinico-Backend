@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon --exec ts-node src/index.ts",
-    "dev:clean": "rm -rf dist node_modules/.cache && nodemon --exec ts-node src/index.ts",
+    "dev:clean": "node -e \"require('fs').rmSync('node_modules/.cache',{recursive:true,force:true})\" && nodemon --exec ts-node src/index.ts",
     "seed": "ts-node src/config/seed.ts",
     "seed:completo": "ts-node src/config/seedCompleto.ts",
     "seed:examenes": "ts-node src/config/seedExamenes.ts",
@@ -19,6 +19,7 @@
     "seed:dia-laboral": "ts-node src/config/seedDiaLaboral.ts",
     "seed:horario-todos": "ts-node src/config/seedHorarioTodos.ts",
     "migrar:estados-vencidos": "ts-node src/config/migrarEstadosVencidos.ts",
+    "clean:seed": "ts-node src/config/cleanAndSeed.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },

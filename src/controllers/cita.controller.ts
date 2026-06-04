@@ -63,12 +63,14 @@ export const crearCita = async (req: any, res: Response) => {
       });
     }
 
-    const citaExistenteDoctor = await Cita.findOne({ doctorId, fecha: fechaUTC, hora, estado: { $in: ESTADOS_OCUPAN_SLOT } });
+    // El índice único de MongoDB aplica a TODOS los estados, no solo activos.
+    // Usamos $nin para bloquear slots ocupados por cualquier cita no cancelada/reprogramada.
+    const citaExistenteDoctor = await Cita.findOne({ doctorId, fecha: fechaUTC, hora, estado: { $nin: ["CANCELADA", "REPROGRAMADA"] } });
     if (citaExistenteDoctor) {
       return res.status(400).json({ success: false, message: "Ya existe una cita para ese horario con este doctor" });
     }
 
-    const citaExistentePaciente = await Cita.findOne({ pacienteId, fecha: fechaUTC, hora, estado: { $in: ESTADOS_OCUPAN_SLOT } });
+    const citaExistentePaciente = await Cita.findOne({ pacienteId, fecha: fechaUTC, hora, estado: { $nin: ["CANCELADA", "REPROGRAMADA"] } });
     if (citaExistentePaciente) {
        return res.status(400).json({ success: false, message: "El paciente ya tiene otra cita médica reservada para esta misma fecha y hora" });
     }
@@ -78,6 +80,10 @@ export const crearCita = async (req: any, res: Response) => {
 
     res.status(201).json({ success: true, data: nuevaCita, message: "Cita creada exitosamente" });
   } catch (error: any) {
+    // E11000: el índice único disparó antes que el check de aplicación (race condition)
+    if (error.code === 11000) {
+      return res.status(400).json({ success: false, message: "Ya existe una cita para ese horario con este doctor" });
+    }
     res.status(500).json({ success: false, message: "Error al crear la cita", error: error.message });
   }
 };

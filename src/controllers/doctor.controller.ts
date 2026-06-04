@@ -181,7 +181,7 @@ export const obtenerHorariosDisponibles = async (req: Request, res: Response) =>
     const citasAgendadas = await Cita.find({
       doctorId: id,
       fecha: fechaUTC,
-      estado: { $in: ESTADOS_OCUPAN_SLOT },
+      estado: { $nin: ["CANCELADA", "REPROGRAMADA"] },
     }).select("hora");
 
     const horasOcupadas = new Set(citasAgendadas.map((c) => c.hora));

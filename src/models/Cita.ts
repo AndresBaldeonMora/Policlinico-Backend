@@ -211,10 +211,11 @@ const citaSchema = new Schema<ICita>(
   { timestamps: true }
 );
 
-// Unicidad para citas de CONSULTA / REMOTA / DOMICILIO (con doctor asignado)
+// Unicidad por doctor+fecha+hora — solo cuando hora está definida (string).
+// Las citas urgentes sin hora fija (hora=null) pueden coexistir múltiples en el mismo día.
 citaSchema.index(
   { doctorId: 1, fecha: 1, hora: 1 },
-  { unique: true, partialFilterExpression: { doctorId: { $type: "objectId" } } }
+  { unique: true, partialFilterExpression: { doctorId: { $type: "objectId" }, hora: { $type: "string" } } }
 );
 
 // Índice para reportes de morbilidad por código CIE-10 (NTS-139)

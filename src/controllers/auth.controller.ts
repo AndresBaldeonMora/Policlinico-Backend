@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { Usuario } from "../models/Usuario";
 import { Paciente } from "../models/Paciente";
 import { getJwtSecret } from "../middlewares/authMiddlewares";
+import type { AuthRequest } from "../middlewares/authMiddlewares";
 
 const JWT_SECRET = getJwtSecret();
 
@@ -134,6 +135,41 @@ export const login = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error en login:", error);
+    res.status(500).json({ message: "Error en el servidor" });
+  }
+};
+
+// --------------------------------------------------
+// 3. CAMBIAR CONTRASEÑA (usuario autenticado)
+//    Obligatorio en primer login cuando debeCambiarPassword = true.
+// --------------------------------------------------
+export const cambiarPassword = async (req: AuthRequest, res: Response) => {
+  try {
+    const { passwordActual, passwordNuevo } = req.body;
+
+    if (typeof passwordActual !== "string" || typeof passwordNuevo !== "string") {
+      return res.status(400).json({ message: "Datos inválidos" });
+    }
+    if (passwordNuevo.length < 8) {
+      return res.status(400).json({ message: "La nueva contraseña debe tener al menos 8 caracteres" });
+    }
+
+    const user = await Usuario.findById(req.user?.userId);
+    if (!user) return res.status(404).json({ message: "Usuario no encontrado" });
+
+    const isValid = await bcrypt.compare(passwordActual, user.passwordHash);
+    if (!isValid) {
+      return res.status(401).json({ message: "La contraseña actual es incorrecta" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.passwordHash = await bcrypt.hash(passwordNuevo, salt);
+    user.debeCambiarPassword = false;
+    await user.save();
+
+    res.json({ success: true, message: "Contraseña actualizada correctamente" });
+  } catch (error) {
+    console.error("Error en cambiarPassword:", error);
     res.status(500).json({ message: "Error en el servidor" });
   }
 };

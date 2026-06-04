@@ -4,6 +4,7 @@ import { Interconsulta } from "../models/Interconsulta";
 import { Doctor } from "../models/Doctor";
 import { Cita } from "../models/Cita";
 import { AuthRequest } from "../middlewares/authMiddlewares";
+import { crearFechaUTC, hoyPeruUTC } from "../utils/fecha.utils";
 
 const getMedicoId = (req: AuthRequest): string | null => req.user?.medicoId ?? null;
 const getRol      = (req: AuthRequest): string => (req.user?.rol ?? "").toUpperCase();
@@ -262,8 +263,8 @@ export const agendarCitaInterconsulta = async (req: AuthRequest, res: Response) 
     const { id } = req.params;
     const { fecha, hora, respuesta } = req.body;
 
-    if (!fecha || !hora) {
-      return res.status(400).json({ success: false, message: "fecha y hora son obligatorias" });
+    if (!fecha) {
+      return res.status(400).json({ success: false, message: "fecha es obligatoria" });
     }
 
     const interconsulta = await Interconsulta.findById(id);
@@ -290,46 +291,49 @@ export const agendarCitaInterconsulta = async (req: AuthRequest, res: Response) 
       return res.status(400).json({ success: false, message: "Fecha inválida" });
     }
 
-    const conflictoMedico = await Cita.findOne({
-      doctorId: new mongoose.Types.ObjectId(medicoId),
-      fecha: fechaUTC, hora,
-      estado: { $nin: ["CANCELADA"] },
-    });
-    if (conflictoMedico) {
-      return res.status(409).json({ success: false, message: "Ya tiene una cita agendada en esa fecha y hora" });
-    }
+    if (hora) {
+      const conflictoMedico = await Cita.findOne({
+        doctorId: new mongoose.Types.ObjectId(medicoId),
+        fecha: fechaUTC, hora,
+        estado: { $nin: ["CANCELADA"] },
+      });
+      if (conflictoMedico) {
+        return res.status(409).json({ success: false, message: "Ya tiene una cita agendada en esa fecha y hora" });
+      }
 
-    const conflictoPaciente = await Cita.findOne({
-      pacienteId: interconsulta.pacienteId,
-      fecha: fechaUTC, hora,
-      estado: { $nin: ["CANCELADA"] },
-    });
-    if (conflictoPaciente) {
-      return res.status(409).json({ success: false, message: "El paciente ya tiene una cita programada a esa hora" });
+      const conflictoPaciente = await Cita.findOne({
+        pacienteId: interconsulta.pacienteId,
+        fecha: fechaUTC, hora,
+        estado: { $nin: ["CANCELADA"] },
+      });
+      if (conflictoPaciente) {
+        return res.status(409).json({ success: false, message: "El paciente ya tiene una cita programada a esa hora" });
+      }
     }
-
-    const nuevaCita = await Cita.create({
-      pacienteId: interconsulta.pacienteId,
-      doctorId: new mongoose.Types.ObjectId(medicoId),
-      fecha: fechaUTC, hora,
-      tipo: "INTERCONSULTA",
-      estado: "PENDIENTE",
-      interconsultaId: interconsulta._id,
-      notasClinicas: interconsulta.motivoConsulta,
-    });
 
     const doctor = await Doctor.findById(medicoId).select("nombres apellidos cmp");
     interconsulta.estado            = "CITADA";
-    interconsulta.citaGeneradaId    = nuevaCita._id as mongoose.Types.ObjectId;
     interconsulta.respondidoPorId   = new mongoose.Types.ObjectId(medicoId);
     interconsulta.respondidoPorNombre = doctor ? `${doctor.nombres} ${doctor.apellidos}` : "Médico";
     interconsulta.respondidoPorCMP  = doctor?.cmp || "";
     interconsulta.fechaRespuesta    = new Date();
-    if (respuesta?.trim()) {
-      interconsulta.respuesta = respuesta.trim();
-    } else if (!interconsulta.respuesta) {
-      interconsulta.respuesta = `Cita presencial agendada para ${fecha} ${hora}`;
+
+    if (hora) {
+      const nuevaCita = await Cita.create({
+        pacienteId: interconsulta.pacienteId,
+        doctorId: new mongoose.Types.ObjectId(medicoId),
+        fecha: fechaUTC, hora,
+        tipo: "INTERCONSULTA",
+        estado: "PENDIENTE",
+        interconsultaId: interconsulta._id,
+        notasClinicas: interconsulta.motivoConsulta,
+      });
+      interconsulta.citaGeneradaId = nuevaCita._id as mongoose.Types.ObjectId;
+      interconsulta.respuesta = respuesta?.trim() || interconsulta.respuesta || `Cita presencial agendada para ${fecha} ${hora}`;
+    } else {
+      interconsulta.respuesta = respuesta?.trim() || `Urgencia agendada para ${fecha} — sin hora fija, atención en primer hueco disponible`;
     }
+
     await interconsulta.save();
 
     const poblada = await Interconsulta.findById(id)
@@ -345,8 +349,10 @@ export const agendarCitaInterconsulta = async (req: AuthRequest, res: Response) 
 };
 
 // ── Agendar cita desde recepción (RECEPCIONISTA) ──────────────────────────────
-// El recepcionista elige el médico, fecha y hora. Crea la cita y actualiza la
-// interconsulta en una sola operación atómica.
+// Reglas MINSA de prioridad:
+//   urgente   → hoy o mañana (máx 48h). Si es hoy → cita en ASISTIO (paciente presente).
+//   preferente → dentro de 72h (máx 3 días).
+//   electiva   → cualquier fecha futura.
 // Body: { doctorId: string, fecha: "YYYY-MM-DD", hora: "HH:MM" }
 export const agendarDesdeRecepcion = async (req: AuthRequest, res: Response) => {
   try {
@@ -375,11 +381,26 @@ export const agendarDesdeRecepcion = async (req: AuthRequest, res: Response) => 
       return res.status(400).json({ success: false, message: "Doctor no encontrado" });
     }
 
-    const fechaUTC = new Date(`${fecha}T00:00:00.000Z`);
+    const fechaUTC = crearFechaUTC(fecha);
     if (isNaN(fechaUTC.getTime())) {
       return res.status(400).json({ success: false, message: "Fecha inválida" });
     }
 
+    // Validar rango de fecha según prioridad (MINSA)
+    const hoy = hoyPeruUTC();
+    const diasDesdeHoy = Math.round((fechaUTC.getTime() - hoy.getTime()) / (24 * 60 * 60 * 1000));
+
+    if (diasDesdeHoy < 0) {
+      return res.status(400).json({ success: false, message: "No se puede agendar en fechas pasadas" });
+    }
+    if (interconsulta.prioridad === "urgente" && diasDesdeHoy > 1) {
+      return res.status(400).json({ success: false, message: "Interconsulta urgente: máximo 48h (hoy o mañana)" });
+    }
+    if (interconsulta.prioridad === "preferente" && diasDesdeHoy > 3) {
+      return res.status(400).json({ success: false, message: "Interconsulta preferente: máximo 72h (3 días)" });
+    }
+
+    // Verificar conflictos
     const conflictoMedico = await Cita.findOne({
       doctorId: new mongoose.Types.ObjectId(doctorId),
       fecha: fechaUTC, hora,
@@ -398,23 +419,30 @@ export const agendarDesdeRecepcion = async (req: AuthRequest, res: Response) => 
       return res.status(409).json({ success: false, message: "El paciente ya tiene otra cita a esa hora" });
     }
 
+    // Urgente + hoy → ASISTIO (paciente ya está presente en el establecimiento)
+    const esHoy = fechaUTC.getTime() === hoy.getTime();
+    const estadoCita = (interconsulta.prioridad === "urgente" && esHoy) ? "ASISTIO" : "PENDIENTE";
+
     const nuevaCita = await Cita.create({
       pacienteId: interconsulta.pacienteId,
       doctorId: new mongoose.Types.ObjectId(doctorId),
-      fecha: fechaUTC, hora,
-      tipo: "INTERCONSULTA",
-      estado: "PENDIENTE",
+      fecha: fechaUTC,
+      hora,
+      tipo: "INTERCONSULTA" as const,
+      estado: estadoCita as "ASISTIO" | "PENDIENTE",
       interconsultaId: interconsulta._id,
       notasClinicas: interconsulta.motivoConsulta,
     });
 
-    interconsulta.estado              = "CITADA";
     interconsulta.citaGeneradaId      = nuevaCita._id as mongoose.Types.ObjectId;
+    interconsulta.respuesta           = estadoCita === "ASISTIO"
+      ? `Cita urgente agendada por recepción para ${fecha} a las ${hora} — paciente en sala`
+      : `Cita agendada por recepción para ${fecha} a las ${hora}`;
+    interconsulta.estado              = "CITADA";
     interconsulta.respondidoPorId     = new mongoose.Types.ObjectId(doctorId);
     interconsulta.respondidoPorNombre = `${doctor.nombres} ${doctor.apellidos}`;
     interconsulta.respondidoPorCMP    = doctor.cmp || "";
     interconsulta.fechaRespuesta      = new Date();
-    interconsulta.respuesta           = `Cita agendada por recepción para ${fecha} a las ${hora}`;
     await interconsulta.save();
 
     const poblada = await Interconsulta.findById(id)
@@ -425,6 +453,9 @@ export const agendarDesdeRecepcion = async (req: AuthRequest, res: Response) => 
 
     res.status(201).json({ success: true, data: poblada });
   } catch (error: any) {
+    if (error.code === 11000) {
+      return res.status(409).json({ success: false, message: "Ya existe una cita para ese horario con este doctor" });
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 };

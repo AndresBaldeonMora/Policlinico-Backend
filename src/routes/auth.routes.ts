@@ -1,15 +1,11 @@
 import { Router } from "express";
-// Importa AMBAS funciones del controlador
-import { login, register } from "../controllers/auth.controller";
+import { login, register, cambiarPassword } from "../controllers/auth.controller";
+import { verifyToken } from "../middlewares/authMiddlewares";
 
 const router = Router();
 
-// Ruta para registrar un nuevo usuario
-// Ej: POST http://localhost:3000/api/auth/register
 router.post("/register", register);
-
-// Ruta para iniciar sesión
-// Ej: POST http://localhost:3000/api/auth/login
 router.post("/login", login);
+router.post("/cambiar-password", verifyToken, cambiarPassword);
 
 export default router;
