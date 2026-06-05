@@ -512,7 +512,13 @@ export const enviarRecordatorioEmail = async (req: Request, res: Response) => {
     if (!paciente) return res.status(404).json({ success: false, message: "Paciente no encontrado" });
     if (!paciente.correo) return res.status(400).json({ success: false, message: "El paciente no tiene correo registrado" });
 
-    const citasDocs = await Cita.find({ pacienteId: paciente._id })
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const citasDocs = await Cita.find({
+      pacienteId: paciente._id,
+      estado: { $in: ["PENDIENTE", "CONFIRMADA"] },
+      fecha: { $gte: hoy },
+    })
       .sort({ fecha: 1 })
       .populate<{ doctorId: { nombres: string; apellidos: string } | null }>(
         "doctorId", "nombres apellidos"
