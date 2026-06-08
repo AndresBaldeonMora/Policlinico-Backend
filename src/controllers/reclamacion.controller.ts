@@ -25,17 +25,32 @@ export const crearReclamacion = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: "Paciente no encontrado" });
     }
 
-    // Correlativo REC-YYYY-XXXX
-    const count = await Reclamacion.countDocuments();
-    const codigoReclamacion = `REC-${new Date().getFullYear()}-${String(count + 1).padStart(4, "0")}`;
-
-    const reclamacion = await Reclamacion.create({
-      codigo: codigoReclamacion,
-      pacienteId,
-      tipo: tipo.toUpperCase(),
-      descripcion: descripcion.trim(),
-      fecha: new Date(),
-    });
+    // Correlativo REC-YYYY-XXXX. El índice único de `codigo` puede chocar si dos
+    // requests concurrentes calculan el mismo correlativo (countDocuments no es
+    // atómico), por eso reintentamos ante un error de clave duplicada (E11000).
+    const anio = new Date().getFullYear();
+    let reclamacion;
+    let codigoReclamacion = "";
+    for (let intento = 0; intento < 5; intento++) {
+      const count = await Reclamacion.countDocuments();
+      codigoReclamacion = `REC-${anio}-${String(count + 1 + intento).padStart(4, "0")}`;
+      try {
+        reclamacion = await Reclamacion.create({
+          codigo: codigoReclamacion,
+          pacienteId,
+          tipo: tipo.toUpperCase(),
+          descripcion: descripcion.trim(),
+          fecha: new Date(),
+        });
+        break;
+      } catch (e: any) {
+        if (e?.code === 11000 && intento < 4) continue; // colisión: reintentar
+        throw e;
+      }
+    }
+    if (!reclamacion) {
+      return res.status(500).json({ success: false, message: "No se pudo generar el código de reclamación" });
+    }
 
     // Enviar correo de confirmación al paciente
     if (paciente.correo) {

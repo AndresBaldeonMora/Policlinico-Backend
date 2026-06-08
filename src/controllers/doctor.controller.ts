@@ -107,9 +107,19 @@ export const actualizarDoctor = async (req: Request, res: Response) => {
       const existe = await Doctor.findOne({ telefono: telefono.trim(), _id: { $ne: req.params.id } });
       if (existe) return res.status(400).json({ success: false, message: "Ya existe un doctor con ese teléfono" });
     }
+    // Whitelist: solo se permiten estos campos para evitar mass-assignment.
+    const { nombres, apellidos, especialidadId, cmp } = req.body;
+    const cambios: Record<string, unknown> = {};
+    if (nombres !== undefined) cambios.nombres = String(nombres).trim();
+    if (apellidos !== undefined) cambios.apellidos = String(apellidos).trim();
+    if (correo !== undefined) cambios.correo = String(correo).trim().toLowerCase();
+    if (telefono !== undefined) cambios.telefono = String(telefono).trim();
+    if (especialidadId !== undefined) cambios.especialidadId = especialidadId;
+    if (cmp !== undefined) cambios.cmp = cmp;
+
     const doctor = await Doctor.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      cambios,
       { new: true, runValidators: true }
     ).populate("especialidadId", "nombre");
 

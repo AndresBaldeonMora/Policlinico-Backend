@@ -42,7 +42,14 @@ app.use(
 const allowedOrigins = [
   process.env.FRONTEND_URL || "http://localhost:5173",
   ...(process.env.NODE_ENV !== "production"
-    ? ["http://localhost:5173", "http://127.0.0.1:5173"]
+    ? [
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
+      ]
     : []),
 ];
 
@@ -74,7 +81,7 @@ app.use(
 // Rate limiting estricto en endpoints de autenticación
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 min
-  limit: 10,
+  limit: process.env.NODE_ENV === "production" ? 10 : 1000,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { success: false, message: "Demasiados intentos. Vuelve a probar en unos minutos." },

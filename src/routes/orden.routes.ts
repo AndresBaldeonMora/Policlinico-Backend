@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   crearOrden,
+  crearOrdenRecepcion,
   listarOrdenesPorPaciente,
   listarOrdenesPorCita,
   listarOrdenesPendientes,
@@ -62,6 +63,8 @@ router.get("/:id/resultado-firmado", requireRole(["ADMINISTRADOR", "RECEPCIONIST
 
 // ── Creación (médico) ──────────────────────────────────────
 router.post("/",                          requireRole(["MEDICO"]), crearOrden);
+// ── Creación directa (recepción) — pasa directo a EN_PROCESO
+router.post("/recepcion",                 requireRole(STAFF_RECEPCION), crearOrdenRecepcion);
 
 // ── Flujo clínico ──────────────────────────────────────────
 router.patch("/:id/autorizar",            requireRole(STAFF_RECEPCION), autorizarOrden);

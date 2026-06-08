@@ -6,7 +6,7 @@ const validarNombre = (nombre: string): string | null => {
   if (!/^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/.test(nombre.trim()))
     return "El nombre solo puede contener letras y espacios";
   if (nombre.trim().length < 3) return "El nombre debe tener al menos 3 caracteres";
-  if (nombre.trim().length > 20) return "El nombre no puede superar los 50 caracteres";
+  if (nombre.trim().length > 20) return "El nombre no puede superar los 20 caracteres";
   return null;
 };
 

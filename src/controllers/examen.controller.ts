@@ -117,9 +117,18 @@ export const crearExamen = async (req: Request, res: Response) => {
 
 export const actualizarExamen = async (req: Request, res: Response) => {
   try {
+    // Whitelist: solo se permiten estos campos para evitar mass-assignment.
+    const { nombre, tipo, descripcion, instrucciones, validezDias } = req.body;
+    const cambios: Record<string, unknown> = {};
+    if (nombre !== undefined) cambios.nombre = String(nombre).trim();
+    if (tipo !== undefined) cambios.tipo = tipo;
+    if (descripcion !== undefined) cambios.descripcion = descripcion;
+    if (instrucciones !== undefined) cambios.instrucciones = instrucciones;
+    if (validezDias !== undefined) cambios.validezDias = validezDias;
+
     const examen = await ExamenLaboratorioImagen.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      cambios,
       { new: true, runValidators: true }
     );
     if (!examen)
@@ -159,6 +168,14 @@ export const crearOrden = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({
         success: false,
         message: "pacienteId, especialidadId e items son obligatorios",
+      });
+    }
+
+    // Cada item debe referenciar un examen válido (evita órdenes con referencias undefined).
+    if (!items.every((i: any) => i && mongoose.isValidObjectId(i.examenId))) {
+      return res.status(400).json({
+        success: false,
+        message: "Cada ítem debe incluir un examenId válido",
       });
     }
 
@@ -236,6 +253,151 @@ export const crearOrden = async (req: AuthRequest, res: Response) => {
       String(orden._id),
       { pacienteId, citaId, especialidadId, items },
       req.ip as string | undefined
+    );
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── Crear orden desde recepción — va directo a EN_PROCESO ────
+// Recepcionista elige: paciente, médico responsable, exámenes, fecha de cita y método de pago.
+// No pasa por PENDIENTE; se autoriza en el mismo acto.
+export const crearOrdenRecepcion = async (req: AuthRequest, res: Response) => {
+  try {
+    const {
+      pacienteId,
+      doctorId,
+      especialidadId,
+      items,
+      observacionesGenerales,
+      // Programación (igual que autorizarOrden)
+      fechaCitaLab,       // "DD/MM/YYYY"  — para LAB/MIXTA
+      citaImagenFecha,    // "DD/MM/YYYY HH:mm" — para IMAGEN/MIXTA
+      salaEquipo,
+      duracionEstimadaMin,
+      // Pago
+      metodoPago,         // "EFECTIVO" | "TARJETA" | "TRANSFERENCIA"
+      montoPagado,
+    } = req.body;
+
+    if (!pacienteId || !doctorId || !especialidadId || !items?.length) {
+      return res.status(400).json({
+        success: false,
+        message: "pacienteId, doctorId, especialidadId e items son obligatorios",
+      });
+    }
+    if (!items.every((i: any) => i && mongoose.isValidObjectId(i.examenId))) {
+      return res.status(400).json({ success: false, message: "Cada ítem debe incluir un examenId válido" });
+    }
+
+    const examenesIds = items.map((i: any) => i.examenId);
+    const examenesData = await ExamenLaboratorioImagen.find({ _id: { $in: examenesIds } }).select("tipo");
+    const examenMap = new Map(examenesData.map((e) => [String(e._id), e.tipo]));
+    const tiposExamenes = examenesData.map((e) => e.tipo);
+    const tipoOrden = detectarTipoOrden(tiposExamenes);
+
+    const necesitaLab    = tipoOrden === "LABORATORIO" || tipoOrden === "MIXTA";
+    const necesitaImagen = tipoOrden === "IMAGEN"      || tipoOrden === "MIXTA";
+
+    if (necesitaLab && !fechaCitaLab) {
+      return res.status(400).json({ success: false, message: "Se requiere fechaCitaLab (DD/MM/YYYY) para exámenes de laboratorio" });
+    }
+    if (necesitaImagen && !citaImagenFecha) {
+      return res.status(400).json({ success: false, message: "Se requiere citaImagenFecha (DD/MM/YYYY HH:mm) para exámenes de imagenología" });
+    }
+
+    const ahora = new Date();
+    let citaLabDate: Date | undefined;
+    let fechaImagen: Date | undefined;
+
+    if (necesitaLab) {
+      try { citaLabDate = parseFecha(fechaCitaLab); } catch {
+        return res.status(400).json({ success: false, message: "fechaCitaLab inválida. Use DD/MM/YYYY" });
+      }
+      citaLabDate = new Date(`${citaLabDate.toISOString().slice(0, 10)}T00:00:00.000Z`);
+      const startOfDay = citaLabDate;
+      const endOfDay   = new Date(`${citaLabDate.toISOString().slice(0, 10)}T23:59:59.999Z`);
+      const ocupados = await OrdenExamen.countDocuments({
+        fechaCitaLab: { $gte: startOfDay, $lte: endOfDay },
+        estado: { $in: ["EN_PROCESO", "ASISTIDO", "FINALIZADO"] },
+      });
+      if (ocupados >= CAPACIDAD_DIARIA_LAB) {
+        const f = `${citaLabDate.getUTCDate().toString().padStart(2,"0")}/${(citaLabDate.getUTCMonth()+1).toString().padStart(2,"0")}/${citaLabDate.getUTCFullYear()}`;
+        return res.status(400).json({ success: false, message: `No hay cupos de laboratorio para el ${f}. Capacidad máxima: ${CAPACIDAD_DIARIA_LAB} pacientes.` });
+      }
+    }
+
+    if (necesitaImagen) {
+      try { fechaImagen = parseFecha(citaImagenFecha); } catch {
+        return res.status(400).json({ success: false, message: "citaImagenFecha inválida. Use DD/MM/YYYY HH:mm" });
+      }
+      const duracion = duracionEstimadaMin ?? 30;
+      const fechaFin = new Date(fechaImagen.getTime() + duracion * 60_000);
+      if (salaEquipo) {
+        const conflicto = await OrdenExamen.findOne({
+          tipoOrden: { $in: ["IMAGEN", "MIXTA"] },
+          salaEquipo,
+          estado: { $in: ["EN_PROCESO", "ASISTIDO", "FINALIZADO"] },
+          citaImagenFecha: { $lt: fechaFin },
+          $expr: { $gt: [{ $add: ["$citaImagenFecha", { $multiply: [{ $ifNull: ["$duracionEstimadaMin", 30] }, 60_000] }] }, fechaImagen] },
+        });
+        if (conflicto) {
+          return res.status(400).json({ success: false, message: `La sala/equipo "${salaEquipo}" ya tiene una cita en ese horario.` });
+        }
+      }
+    }
+
+    const diasVencimiento = necesitaImagen ? 30 : 7;
+    const fechaVencimiento = new Date(ahora);
+    fechaVencimiento.setDate(fechaVencimiento.getDate() + diasVencimiento);
+
+    const codigoOrden = await generarCodigoOrden();
+
+    const orden = await OrdenExamen.create({
+      pacienteId,
+      doctorId,
+      especialidadId,
+      codigoOrden,
+      tipoOrden,
+      items: items.map((item: any) => {
+        const tipo = examenMap.get(String(item.examenId)) ?? "";
+        const seccion: "LAB" | "IMAGEN" = TIPOS_IMAGEN.includes(tipo) ? "IMAGEN" : "LAB";
+        return {
+          examenId:              item.examenId,
+          seccion,
+          observaciones:         item.observaciones || "",
+          respuestasProtocolares: [],
+          estadoItem:            "PENDIENTE",
+        };
+      }),
+      observacionesGenerales: observacionesGenerales || "",
+      estado:             "EN_PROCESO",
+      fechaAutorizacion:  ahora,
+      fechaVencimiento,
+      ...(citaLabDate   && { fechaCitaLab: citaLabDate }),
+      ...(fechaImagen   && { citaImagenFecha: fechaImagen, duracionEstimadaMin: duracionEstimadaMin ?? 30 }),
+      ...(salaEquipo    && { salaEquipo }),
+      // Metadatos de pago (informativos, no afectan el flujo clínico)
+      ...(metodoPago    && { metodoPago }),
+      ...(montoPagado   !== undefined && { montoPagado }),
+      creadoPorRecepcion: true,
+    });
+
+    const ordenPoblada = await OrdenExamen.findById(orden._id)
+      .populate("pacienteId", "nombres apellidos dni fechaNacimiento sexo correo")
+      .populate("doctorId", "nombres apellidos cmp")
+      .populate("especialidadId", "nombre")
+      .populate("items.examenId", "nombre tipo precio instrucciones preguntasProtocolares");
+
+    res.status(201).json({ success: true, data: ordenPoblada });
+
+    await registrarAudit(
+      req.user?.userId ?? "desconocido",
+      "crear_orden_recepcion",
+      String(orden._id),
+      { pacienteId, doctorId, especialidadId, tipoOrden, metodoPago, montoPagado },
+      req.ip as string | undefined,
+      { estadoAnterior: "-", estadoNuevo: "EN_PROCESO", descripcion: "Orden creada directamente por recepción con pago registrado" }
     );
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });

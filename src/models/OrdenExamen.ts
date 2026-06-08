@@ -60,6 +60,9 @@ export interface IOrdenExamen extends Document {
   items: IItemOrden[];
   estado: EstadoOrdenExamen;
   observacionesGenerales?: string;
+  metodoPago?: "EFECTIVO" | "TARJETA" | "TRANSFERENCIA";
+  montoPagado?: number;
+  creadoPorRecepcion?: boolean;
 }
 
 const respuestaProtocolarSchema = new Schema<IRespuestaProtocolar>(
@@ -135,6 +138,9 @@ const ordenExamenSchema = new Schema<IOrdenExamen>(
       required: true,
     },
     observacionesGenerales: { type: String, trim: true, default: "" },
+    metodoPago:         { type: String, enum: ["EFECTIVO", "TARJETA", "TRANSFERENCIA"] },
+    montoPagado:        { type: Number, min: 0 },
+    creadoPorRecepcion: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
