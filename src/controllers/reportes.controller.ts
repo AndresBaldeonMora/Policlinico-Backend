@@ -41,7 +41,18 @@ export const reporteOrdenesPorPeriodo = async (req: AuthRequest, res: Response) 
 
 export const reporteExamenesMasSolicitados = async (req: AuthRequest, res: Response) => {
   try {
+    const { fechaInicio, fechaFin } = req.query;
+
+    const match: Record<string, unknown> = {};
+    if (fechaInicio && fechaFin) {
+      match.createdAt = {
+        $gte: new Date(fechaInicio as string),
+        $lte: finDelDiaUTC(fechaFin as string),
+      };
+    }
+
     const examenes = await OrdenExamen.aggregate([
+      ...(Object.keys(match).length ? [{ $match: match }] : []),
       { $unwind: "$items" },
       {
         $group: {
