@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
 import { Doctor } from "../models/Doctor";
 import { Cita, ESTADOS_OCUPAN_SLOT } from "../models/Cita";
+import { Horario } from "../models/Horario";
+import { Usuario } from "../models/Usuario";
+import mongoose from "mongoose";
 import { BloqueoHorario } from "../models/BloqueoHorario";
 import { crearFechaUTC, ahoraPeru, hoyPeruUTC } from "../utils/fecha.utils";
 
@@ -130,17 +133,98 @@ export const actualizarDoctor = async (req: Request, res: Response) => {
   }
 };
 
+interface DependenciaDoctor {
+  tipo: "CITAS_ACTIVAS" | "HORARIOS_RESERVADOS" | "USUARIO_VINCULADO";
+  cantidad?: number;
+  mensaje: string;
+}
+
+async function verificarDependenciasDoctor(doctorId: string): Promise<DependenciaDoctor[]> {
+  const dependencias: DependenciaDoctor[] = [];
+  const hoy = new Date();
+  hoy.setUTCHours(0, 0, 0, 0); // medianoche UTC de hoy
+
+  // Ejecutar las tres validaciones en paralelo
+  const [citasActivas, horariosReservados, usuarioVinculado] = await Promise.all([
+    Cita.countDocuments({
+      doctorId,
+      estado: { $in: ["PENDIENTE", "ASISTIO"] }
+    }),
+    Horario.countDocuments({
+      doctorId,
+      reservado: true,
+      fecha: { $gte: hoy }
+    }),
+    Usuario.findOne({ medicoId: doctorId }).select("nombres apellidos correo")
+  ]);
+
+  if (citasActivas > 0) {
+    dependencias.push({
+      tipo: "CITAS_ACTIVAS",
+      cantidad: citasActivas,
+      mensaje: `Tiene ${citasActivas} cita(s) en estado Pendiente o Asistió.`
+    });
+  }
+
+  if (horariosReservados > 0) {
+    dependencias.push({
+      tipo: "HORARIOS_RESERVADOS",
+      cantidad: horariosReservados,
+      mensaje: `Tiene ${horariosReservados} horario(s) reservado(s) a futuro.`
+    });
+  }
+
+  if (usuarioVinculado) {
+    dependencias.push({
+      tipo: "USUARIO_VINCULADO",
+      mensaje: `Está vinculado a la cuenta de usuario ${usuarioVinculado.nombres} ${usuarioVinculado.apellidos} (${usuarioVinculado.correo}).`
+    });
+  }
+
+  return dependencias;
+}
+
 export const eliminarDoctor = async (req: Request, res: Response) => {
   try {
-    const doctor = await Doctor.findByIdAndDelete(req.params.id);
+    const id = req.params.id as string;   // ✅ así se arregla
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "ID inválido" });
+    }
+
+    const doctor = await Doctor.findById(id);
     if (!doctor) {
       return res.status(404).json({ success: false, message: "Doctor no encontrado" });
     }
+
+    const dependencias = await verificarDependenciasDoctor(id);
+    if (dependencias.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: "No se puede eliminar el doctor porque tiene dependencias activas.",
+        dependencias,
+      });
+    }
+
+    await Doctor.findByIdAndDelete(id);
     res.json({ success: true, message: "Doctor eliminado" });
   } catch (error: any) {
+    console.error("Error en eliminarDoctor:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// export const eliminarDoctor = async (req: Request, res: Response) => {
+//   try {
+//     const doctor = await Doctor.findByIdAndDelete(req.params.id);
+//     if (!doctor) {
+//       return res.status(404).json({ success: false, message: "Doctor no encontrado" });
+//     }
+//     res.json({ success: true, message: "Doctor eliminado" });
+//   } catch (error: any) {
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
 
 ///CRUD////
 
