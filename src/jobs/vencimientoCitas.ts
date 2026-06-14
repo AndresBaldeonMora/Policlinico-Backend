@@ -56,11 +56,9 @@ export const verificarCitasVencidas = async (): Promise<number> => {
 
     try {
       await AuditLog.create({
-        // Acción automática del sistema (no hay usuario real). Conservamos el
-        // doctorId/pacienteId como referencia de traza, pero lo etiquetamos como
-        // Sistema para no atribuir falsamente la acción a una persona.
-        usuarioId: cita.doctorId || cita.pacienteId,
-        usuarioNombre: "Sistema (vencimiento automático)",
+        // Acción automática del sistema (no hay usuario real).
+        usuarioId: null,
+        usuarioNombre: "Sistema (Cron)",
         accion: "vencer_cita_automatica",
         entidad: "Cita",
         entidadId: cita._id,
