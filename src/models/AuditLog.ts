@@ -10,7 +10,8 @@ export type EntidadAudit =
   | "Medicamento"
   | "BloqueoHorario"
   | "ServicioDomicilio"
-  | "CitaRemota";
+  | "CitaRemota"
+  | "Reclamacion";
 
 export interface IAuditLog extends Document {
   usuarioId: mongoose.Types.ObjectId;
@@ -32,7 +33,7 @@ const auditLogSchema = new Schema<IAuditLog>({
   accion: { type: String, required: true, trim: true },
   entidad: {
     type: String,
-    enum: ["Cita", "OrdenExamen", "Paciente", "Doctor", "Usuario", "Especialidad", "Medicamento", "BloqueoHorario", "ServicioDomicilio", "CitaRemota"],
+    enum: ["Cita", "OrdenExamen", "Paciente", "Doctor", "Usuario", "Especialidad", "Medicamento", "BloqueoHorario", "ServicioDomicilio", "CitaRemota", "Reclamacion"],
     required: true,
   },
   entidadId: { type: Schema.Types.ObjectId, required: true },

@@ -1,7 +1,9 @@
+import mongoose from "mongoose";
 import { Response } from "express";
 import { AuthRequest } from "../middlewares/authMiddlewares";
 import { Reclamacion } from "../models/Reclamacion";
 import { Paciente } from "../models/Paciente";
+import { registrarAuditoria } from "../utils/auditoria";
 import { enviarCorreoReclamacion } from "../config/mailer";
 
 // Registrar una queja o reclamo
@@ -82,18 +84,95 @@ export const crearReclamacion = async (req: AuthRequest, res: Response) => {
 };
 
 // Listar todas las reclamaciones (sólo Admin)
+// export const listarReclamaciones = async (req: AuthRequest, res: Response) => {
+//   try {
+//     const reclamaciones = await Reclamacion.find()
+//       .populate("pacienteId", "nombres apellidos dni correo telefono")
+//       .sort({ fecha: -1 });
+
+//     res.json({
+//       success: true,
+//       data: reclamaciones,
+//     });
+//   } catch (error: any) {
+//     console.error("Error en listarReclamaciones:", error);
+//     res.status(500).json({ success: false, message: "Error al listar las reclamaciones" });
+//   }
+// };
 export const listarReclamaciones = async (req: AuthRequest, res: Response) => {
   try {
     const reclamaciones = await Reclamacion.find()
       .populate("pacienteId", "nombres apellidos dni correo telefono")
       .sort({ fecha: -1 });
-
-    res.json({
-      success: true,
-      data: reclamaciones,
-    });
+    res.json({ success: true, data: reclamaciones });
   } catch (error: any) {
     console.error("Error en listarReclamaciones:", error);
     res.status(500).json({ success: false, message: "Error al listar las reclamaciones" });
+  }
+};
+
+// Gestionar estado y respuesta de una reclamación (solo ADMIN)
+export const gestionarReclamacion = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { estado, respuestaAdmin } = req.body;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "ID inválido" });
+    }
+
+    const reclamacion = await Reclamacion.findById(id);
+    if (!reclamacion) {
+      return res.status(404).json({ success: false, message: "Reclamación no encontrada" });
+    }
+
+    // Validar estado
+    if (estado && !["PENDIENTE", "EN_REVISION", "RESUELTO"].includes(estado)) {
+      return res.status(400).json({ success: false, message: "Estado no válido" });
+    }
+
+    // Si se quiere marcar como RESUELTO, es obligatorio una respuesta no vacía
+    if (estado === "RESUELTO" && (!respuestaAdmin || !respuestaAdmin.trim())) {
+      return res.status(400).json({ success: false, message: "Para marcar como RESUELTO, debes proporcionar una respuesta al paciente." });
+    }
+
+    const estadoAnterior = reclamacion.estado;
+
+    if (estado) reclamacion.estado = estado;
+    if (respuestaAdmin !== undefined) {
+      reclamacion.respuestaAdmin = respuestaAdmin.trim() || undefined;
+    }
+
+    // Manejo de fecha de resolución
+    if (estado === "RESUELTO" && estadoAnterior !== "RESUELTO") {
+      reclamacion.fechaResolucion = new Date();
+    } else if (estado !== "RESUELTO") {
+      reclamacion.fechaResolucion = undefined;
+    }
+
+    await reclamacion.save();
+
+    await registrarAuditoria({
+      req,
+      accion: "GESTIONAR_RECLAMACION",
+      entidad: "Reclamacion",
+      entidadId: reclamacion._id,
+      estadoAnterior,
+      estadoNuevo: reclamacion.estado,
+      descripcion: `Cambio de estado a ${reclamacion.estado}${reclamacion.respuestaAdmin ? ` y respuesta agregada` : ""}`,
+      detalles: {
+        respuestaAdmin: reclamacion.respuestaAdmin,
+        fechaResolucion: reclamacion.fechaResolucion,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Reclamación actualizada correctamente",
+      data: reclamacion,
+    });
+  } catch (error: any) {
+    console.error("Error en gestionarReclamacion:", error);
+    res.status(500).json({ success: false, message: "Error al gestionar la reclamación" });
   }
 };

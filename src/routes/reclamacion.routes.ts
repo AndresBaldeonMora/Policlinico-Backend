@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { verifyToken, requirePaciente, requireRole } from "../middlewares/authMiddlewares";
-import { crearReclamacion, listarReclamaciones } from "../controllers/reclamacion.controller";
+import { crearReclamacion, listarReclamaciones,gestionarReclamacion } from "../controllers/reclamacion.controller";
 
 const router = Router();
 
@@ -12,5 +12,5 @@ router.post("/", requirePaciente, crearReclamacion);
 
 // Listar quejas/reclamos (exclusivo para administradores)
 router.get("/", requireRole(["ADMINISTRADOR"]), listarReclamaciones);
-
+router.patch("/:id/gestionar", requireRole(["ADMINISTRADOR"]), gestionarReclamacion);
 export default router;
