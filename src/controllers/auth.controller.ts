@@ -1,10 +1,12 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { Usuario } from "../models/Usuario";
 import { Paciente } from "../models/Paciente";
 import { getJwtSecret } from "../middlewares/authMiddlewares";
 import type { AuthRequest } from "../middlewares/authMiddlewares";
+import transporter from "../config/mailer";
 
 const JWT_SECRET = getJwtSecret();
 
@@ -170,6 +172,100 @@ export const cambiarPassword = async (req: AuthRequest, res: Response) => {
     res.json({ success: true, message: "Contraseña actualizada correctamente" });
   } catch (error) {
     console.error("Error en cambiarPassword:", error);
+    res.status(500).json({ message: "Error en el servidor" });
+  }
+};
+
+// --------------------------------------------------
+// 4. SOLICITAR RESET DE CONTRASEÑA (público)
+//    Envía un correo con enlace de reset válido por 1 hora.
+// --------------------------------------------------
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const correo = typeof req.body.correo === "string" ? req.body.correo.toLowerCase().trim() : "";
+    if (!correo) {
+      return res.status(400).json({ message: "El correo es obligatorio" });
+    }
+
+    const user = await Usuario.findOne({ correo });
+
+    // Siempre respondemos con éxito para no enumerar correos
+    if (!user || user.activo === false) {
+      return res.json({ success: true, message: "Si el correo existe, recibirás las instrucciones." });
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+    user.resetPasswordToken = crypto.createHash("sha256").update(token).digest("hex");
+    user.resetPasswordExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+    await user.save();
+
+    const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:5173";
+    const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
+
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:8px;">
+        <h2 style="color:#0f172a;margin-bottom:8px;">Restablecer contraseña</h2>
+        <p>Estimado(a) <strong>${user.nombres} ${user.apellidos}</strong>,</p>
+        <p>Recibimos una solicitud para restablecer tu contraseña. Haz clic en el botón de abajo. Este enlace expirará en <strong>1 hora</strong>.</p>
+        <div style="text-align:center;margin:28px 0;">
+          <a href="${resetUrl}" style="background:#2563eb;color:white;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">
+            Restablecer contraseña
+          </a>
+        </div>
+        <p style="color:#64748b;font-size:13px;">Si no solicitaste este cambio, ignora este correo. Tu contraseña seguirá siendo la misma.</p>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;">
+        <p style="color:#94a3b8;font-size:12px;">Policlínico Parroquial San José · Este es un correo automático, por favor no respondas.</p>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: `"Policlínico San José" <${process.env.SMTP_USER}>`,
+      to: correo,
+      subject: "Restablecer contraseña | Policlínico San José",
+      html,
+    });
+
+    res.json({ success: true, message: "Si el correo existe, recibirás las instrucciones." });
+  } catch (error) {
+    console.error("Error en forgotPassword:", error);
+    res.status(500).json({ message: "Error en el servidor" });
+  }
+};
+
+// --------------------------------------------------
+// 5. RESETEAR CONTRASEÑA CON TOKEN (público)
+// --------------------------------------------------
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const { token, passwordNuevo } = req.body;
+
+    if (typeof token !== "string" || typeof passwordNuevo !== "string") {
+      return res.status(400).json({ message: "Datos inválidos" });
+    }
+    if (passwordNuevo.length < 8) {
+      return res.status(400).json({ message: "La contraseña debe tener al menos 8 caracteres" });
+    }
+
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+    const user = await Usuario.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpiry: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "El enlace es inválido o ha expirado." });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.passwordHash = await bcrypt.hash(passwordNuevo, salt);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpiry = undefined;
+    user.debeCambiarPassword = false;
+    await user.save();
+
+    res.json({ success: true, message: "Contraseña restablecida correctamente. Ya puedes iniciar sesión." });
+  } catch (error) {
+    console.error("Error en resetPassword:", error);
     res.status(500).json({ message: "Error en el servidor" });
   }
 };

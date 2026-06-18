@@ -12,6 +12,8 @@ export interface IUsuario extends Document {
   debeCambiarPassword: boolean;
   medicoId?: mongoose.Types.ObjectId;
   pacienteId?: mongoose.Types.ObjectId;
+  resetPasswordToken?: string;
+  resetPasswordExpiry?: Date;
 }
 
 const usuarioSchema = new Schema<IUsuario>(
@@ -40,6 +42,8 @@ const usuarioSchema = new Schema<IUsuario>(
       ref: "Paciente",
       required: false,
     },
+    resetPasswordToken: { type: String, required: false },
+    resetPasswordExpiry: { type: Date, required: false },
   },
   { timestamps: true }
 );
