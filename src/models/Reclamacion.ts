@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 export type TipoReclamacion = "QUEJA" | "RECLAMO";
+export type EstadoReclamacion = "PENDIENTE" | "EN_REVISION" | "RESUELTO";
 
 export interface IReclamacion extends Document {
   codigo: string;
@@ -8,6 +9,9 @@ export interface IReclamacion extends Document {
   tipo: TipoReclamacion;
   descripcion: string;
   fecha: Date;
+  estado: EstadoReclamacion;
+  respuestaAdmin?: string;
+  fechaResolucion?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,6 +37,14 @@ const reclamacionSchema = new Schema<IReclamacion>(
       type: Date,
       default: Date.now,
     },
+    estado: {
+      type: String,
+      enum: ["PENDIENTE", "EN_REVISION", "RESUELTO"],
+      default: "PENDIENTE",
+      required: true,
+    },
+    respuestaAdmin: { type: String, trim: true, default: undefined }, 
+    fechaResolucion: { type: Date, default: undefined }, 
   },
   { timestamps: true }
 );
