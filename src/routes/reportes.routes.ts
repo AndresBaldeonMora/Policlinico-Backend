@@ -9,9 +9,9 @@ import {
 
 const router = Router();
 
-router.get("/ordenes-por-periodo",      verifyToken, requireRole(["administrador"]), reporteOrdenesPorPeriodo);
-router.get("/examenes-mas-solicitados", verifyToken, requireRole(["administrador"]), reporteExamenesMasSolicitados);
-router.get("/citas-por-periodo",        verifyToken, requireRole(["administrador"]), reporteCitasPorPeriodo);
-router.get("/citas-por-especialidad",   verifyToken, requireRole(["administrador"]), reporteCitasPorEspecialidad);
+router.get("/ordenes-por-periodo",      verifyToken, requireRole(["ADMINISTRADOR"]), reporteOrdenesPorPeriodo);
+router.get("/examenes-mas-solicitados", verifyToken, requireRole(["ADMINISTRADOR"]), reporteExamenesMasSolicitados);
+router.get("/citas-por-periodo",        verifyToken, requireRole(["ADMINISTRADOR"]), reporteCitasPorPeriodo);
+router.get("/citas-por-especialidad",   verifyToken, requireRole(["ADMINISTRADOR"]), reporteCitasPorEspecialidad);
 
 export default router;

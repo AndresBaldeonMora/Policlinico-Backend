@@ -31,22 +31,43 @@ const mapUsuario = (u: any) => ({
 // ─────────────────────────────────────────────────────────────
 export const listarUsuarios = async (req: AuthRequest, res: Response) => {
   try {
-    const { rol, activo, q } = req.query;
-    const filtro: Record<string, unknown> = {};
+    const { rol, activo, q, page, limit } = req.query;
 
-    if (rol) filtro.rol = String(rol).toUpperCase();
-    if (activo === "true")  filtro.activo = true;
-    if (activo === "false") filtro.activo = false;
+    // Filtro base (rol + búsqueda): se usa también para contar los activos,
+    // de modo que el contador del header sea coherente con la búsqueda actual
+    // sin verse afectado por el filtro de estado.
+    const filtroBase: Record<string, unknown> = {};
+    if (rol) filtroBase.rol = String(rol).toUpperCase();
     if (q) {
       const re = { $regex: String(q), $options: "i" };
-      filtro.$or = [{ nombres: re }, { apellidos: re }, { correo: re }];
+      filtroBase.$or = [{ nombres: re }, { apellidos: re }, { correo: re }];
     }
 
-    const usuarios = await Usuario.find(filtro)
-      .select("-passwordHash")
-      .sort({ createdAt: -1 });
+    const filtro: Record<string, unknown> = { ...filtroBase };
+    if (activo === "true")  filtro.activo = true;
+    if (activo === "false") filtro.activo = false;
 
-    res.json({ success: true, data: usuarios.map(mapUsuario) });
+    const pageNum  = Math.max(1, parseInt(String(page ?? "1"), 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(String(limit ?? "25"), 10) || 25));
+    const skip = (pageNum - 1) * limitNum;
+
+    const [usuarios, total, totalActivos] = await Promise.all([
+      Usuario.find(filtro).select("-passwordHash").sort({ createdAt: -1 }).skip(skip).limit(limitNum),
+      Usuario.countDocuments(filtro),
+      Usuario.countDocuments({ ...filtroBase, activo: true }),
+    ]);
+
+    res.json({
+      success: true,
+      data: usuarios.map(mapUsuario),
+      paginacion: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPaginas: Math.max(1, Math.ceil(total / limitNum)),
+      },
+      totalActivos,
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
