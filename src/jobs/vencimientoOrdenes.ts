@@ -24,7 +24,8 @@ export const verificarOrdenesVencidas = async (): Promise<number> => {
 
     try {
       await AuditLog.create({
-        usuarioId: orden.doctorId,
+        usuarioId: null,
+        usuarioNombre: "Sistema (Cron)",
         accion: "vencer_orden",
         entidad: "OrdenExamen",
         entidadId: orden._id,

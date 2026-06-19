@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { Especialidad } from "../models/Especialidad";
+import { Doctor } from "../models/Doctor";
 
 const validarNombre = (nombre: string): string | null => {
   if (!nombre?.trim()) return "El nombre es obligatorio";
@@ -64,6 +65,16 @@ export const crearEspecialidad = async (req: Request, res: Response) => {
 // Eliminar especialidad
 export const eliminarEspecialidad = async (req: Request, res: Response) => {
   try {
+    // GAP-A9: Verificar si hay doctores asignados a esta especialidad
+    const doctores = await Doctor.find({ especialidadId: req.params.id });
+    if (doctores.length > 0) {
+      const listaDoctores = doctores.map(d => `${d.nombres} ${d.apellidos}`).join(", ");
+      return res.status(409).json({
+        success: false,
+        message: `No se puede eliminar la especialidad porque tiene doctores asignados: ${listaDoctores}`,
+      });
+    }
+
     const especialidad = await Especialidad.findByIdAndDelete(req.params.id);
     if (!especialidad) {
       return res.status(404).json({ success: false, message: "Especialidad no encontrada" });

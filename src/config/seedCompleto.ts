@@ -9,6 +9,9 @@ import { Cita } from "../models/Cita";
 import { Medicamento } from "../models/Medicamento";
 import { ExamenLaboratorioImagen } from "../models/ExamenLaboratorioImagen";
 import { OrdenExamen } from "../models/OrdenExamen";
+import { Usuario } from "../models/Usuario";
+import { Reclamacion } from "../models/Reclamacion";
+import bcrypt from "bcryptjs";
 
 const especialidades = [
   { nombre: "Medicina General",          tieneLaboratorioImagen: true,  consultorio: 1  },
@@ -24,18 +27,26 @@ const especialidades = [
 ];
 
 const medicamentos = [
-  { nombre: "Amoxicilina 500mg", principioActivo: "Amoxicilina", presentacion: "Cápsulas" },
-  { nombre: "Paracetamol 500mg", principioActivo: "Paracetamol", presentacion: "Tabletas" },
-  { nombre: "Ibuprofeno 400mg", principioActivo: "Ibuprofeno", presentacion: "Tabletas" },
-  { nombre: "Omeprazol 20mg", principioActivo: "Omeprazol", presentacion: "Cápsulas" },
-  { nombre: "Losartán 50mg", principioActivo: "Losartán", presentacion: "Tabletas" },
-  { nombre: "Metformina 500mg", principioActivo: "Metformina", presentacion: "Tabletas" },
-  { nombre: "Atorvastatina 10mg", principioActivo: "Atorvastatina", presentacion: "Tabletas" },
-  { nombre: "Lisinopril 10mg", principioActivo: "Lisinopril", presentacion: "Tabletas" },
-  { nombre: "Fluoxetina 20mg", principioActivo: "Fluoxetina", presentacion: "Cápsulas" },
-  { nombre: "Ranitidina 150mg", principioActivo: "Ranitidina", presentacion: "Tabletas" },
-  { nombre: "Cetirizina 10mg", principioActivo: "Cetirizina", presentacion: "Tabletas" },
-  { nombre: "Loratadina 10mg", principioActivo: "Loratadina", presentacion: "Tabletas" },
+  { nombre: "Amoxicilina 500mg", principioActivo: "Amoxicilina", dci: "Amoxicilina", concentracion: "500mg", formaFarmaceutica: "Cápsula", viaAdministracion: "Oral", presentacion: "Cápsulas" },
+  { nombre: "Paracetamol 500mg", principioActivo: "Paracetamol", dci: "Paracetamol", concentracion: "500mg", formaFarmaceutica: "Tableta", viaAdministracion: "Oral", presentacion: "Tabletas" },
+  { nombre: "Ibuprofeno 400mg", principioActivo: "Ibuprofeno", dci: "Ibuprofeno", concentracion: "400mg", formaFarmaceutica: "Tableta", viaAdministracion: "Oral", presentacion: "Tabletas" },
+  { nombre: "Omeprazol 20mg", principioActivo: "Omeprazol", dci: "Omeprazol", concentracion: "20mg", formaFarmaceutica: "Cápsula", viaAdministracion: "Oral", presentacion: "Cápsulas" },
+  { nombre: "Losartán 50mg", principioActivo: "Losartán", dci: "Losartán", concentracion: "50mg", formaFarmaceutica: "Tableta", viaAdministracion: "Oral", presentacion: "Tabletas" },
+  { nombre: "Metformina 500mg", principioActivo: "Metformina", dci: "Metformina", concentracion: "500mg", formaFarmaceutica: "Tableta", viaAdministracion: "Oral", presentacion: "Tabletas" },
+  { nombre: "Atorvastatina 10mg", principioActivo: "Atorvastatina", dci: "Atorvastatina", concentracion: "10mg", formaFarmaceutica: "Tableta", viaAdministracion: "Oral", presentacion: "Tabletas" },
+  { nombre: "Lisinopril 10mg", principioActivo: "Lisinopril", dci: "Lisinopril", concentracion: "10mg", formaFarmaceutica: "Tableta", viaAdministracion: "Oral", presentacion: "Tabletas" },
+  { nombre: "Fluoxetina 20mg", principioActivo: "Fluoxetina", dci: "Fluoxetina", concentracion: "20mg", formaFarmaceutica: "Cápsula", viaAdministracion: "Oral", presentacion: "Cápsulas" },
+  { nombre: "Ranitidina 150mg", principioActivo: "Ranitidina", dci: "Ranitidina", concentracion: "150mg", formaFarmaceutica: "Tableta", viaAdministracion: "Oral", presentacion: "Tabletas" },
+  { nombre: "Cetirizina 10mg", principioActivo: "Cetirizina", dci: "Cetirizina", concentracion: "10mg", formaFarmaceutica: "Tableta", viaAdministracion: "Oral", presentacion: "Tabletas" },
+  { nombre: "Loratadina 10mg", principioActivo: "Loratadina", dci: "Loratadina", concentracion: "10mg", formaFarmaceutica: "Tableta", viaAdministracion: "Oral", presentacion: "Tabletas" },
+  { nombre: "Diclofenaco 50mg", principioActivo: "Diclofenaco", dci: "Diclofenaco", concentracion: "50mg", formaFarmaceutica: "Tableta", viaAdministracion: "Oral", presentacion: "Tabletas" },
+  { nombre: "Salbutamol Inhalador", principioActivo: "Salbutamol", dci: "Salbutamol", concentracion: "100mcg/dosis", formaFarmaceutica: "Inhalador", viaAdministracion: "Inhalatoria", presentacion: "Inhalador" },
+  { nombre: "Azitromicina 500mg", principioActivo: "Azitromicina", dci: "Azitromicina", concentracion: "500mg", formaFarmaceutica: "Tableta", viaAdministracion: "Oral", presentacion: "Tabletas" },
+  { nombre: "Naproxeno 550mg", principioActivo: "Naproxeno", dci: "Naproxeno", concentracion: "550mg", formaFarmaceutica: "Tableta", viaAdministracion: "Oral", presentacion: "Tabletas" },
+  { nombre: "Dexametasona 4mg", principioActivo: "Dexametasona", dci: "Dexametasona", concentracion: "4mg", formaFarmaceutica: "Ampolla", viaAdministracion: "Intramuscular", presentacion: "Ampollas" },
+  { nombre: "Clotrimazol Crema", principioActivo: "Clotrimazol", dci: "Clotrimazol", concentracion: "1%", formaFarmaceutica: "Crema", viaAdministracion: "Tópica", presentacion: "Tubo" },
+  { nombre: "Metoclopramida 10mg", principioActivo: "Metoclopramida", dci: "Metoclopramida", concentracion: "10mg", formaFarmaceutica: "Tableta", viaAdministracion: "Oral", presentacion: "Tabletas" },
+  { nombre: "Ciprofloxacino 500mg", principioActivo: "Ciprofloxacino", dci: "Ciprofloxacino", concentracion: "500mg", formaFarmaceutica: "Tableta", viaAdministracion: "Oral", presentacion: "Tabletas" },
 ];
 
 const examenes = [
@@ -220,6 +231,8 @@ async function seedCompleto() {
     await Medicamento.deleteMany({});
     await Especialidad.deleteMany({});
     await Doctor.deleteMany({});
+    await Usuario.deleteMany({});
+    await Reclamacion.deleteMany({});
     console.log("✅ Colecciones limpiadas");
 
     // CREAR ESPECIALIDADES
@@ -229,7 +242,7 @@ async function seedCompleto() {
     // CREAR DOCTORES (varios por especialidad)
     const doctores: any[] = [];
     for (const especialidad of especialidadesCreadas) {
-      for (let i = 1; i <= 2; i++) {
+      for (let i = 1; i <= 1; i++) {
         const nombre = primerosNombres[Math.floor(Math.random() * primerosNombres.length)];
         const apellido = apellidos[Math.floor(Math.random() * apellidos.length)];
         doctores.push({
@@ -280,6 +293,65 @@ async function seedCompleto() {
     }
     const pacientesCreados = await Paciente.insertMany(pacientes);
     console.log(`✅ ${pacientesCreados.length} pacientes creados`);
+
+    // CREAR USUARIOS
+    const usuarios: any[] = [];
+    const passwordHashAdmin = await bcrypt.hash("administrador", 10);
+    usuarios.push({
+      nombres: "Administrador", apellidos: "Principal", correo: "administrador@sanjose.com",
+      passwordHash: passwordHashAdmin, rol: "ADMINISTRADOR",
+    });
+
+    const passwordHashRecep = await bcrypt.hash("recepcionista", 10);
+    usuarios.push({
+      nombres: "Recepcionista", apellidos: "Uno", correo: "recepcionista1@sanjose.com",
+      passwordHash: passwordHashRecep, rol: "RECEPCIONISTA",
+    });
+    usuarios.push({
+      nombres: "Recepcionista", apellidos: "Dos", correo: "recepcionista2@sanjose.com",
+      passwordHash: passwordHashRecep, rol: "RECEPCIONISTA",
+    });
+
+    for (const doctor of doctoresCreados) {
+      const passwordHashMed = await bcrypt.hash("medico123", 10);
+      usuarios.push({
+        nombres: doctor.nombres, apellidos: doctor.apellidos, correo: doctor.correo,
+        passwordHash: passwordHashMed, rol: "MEDICO", medicoId: doctor._id,
+      });
+    }
+    const usuariosCreados = await Usuario.insertMany(usuarios);
+    console.log(`✅ ${usuariosCreados.length} usuarios creados`);
+
+    // CREAR RECLAMACIONES
+    const reclamaciones = [
+      {
+        codigo: "REC-2026-0609-001",
+        pacienteId: pacientesCreados[0]._id,
+        tipo: "QUEJA",
+        descripcion: "Demora excesiva en la atención de recepción.",
+        estado: "PENDIENTE",
+        createdAt: new Date(),
+      },
+      {
+        codigo: "REC-2026-0609-002",
+        pacienteId: pacientesCreados[1]._id,
+        tipo: "RECLAMO",
+        descripcion: "Cobro indebido por consulta no realizada.",
+        estado: "EN_REVISION",
+        createdAt: new Date(),
+      },
+      {
+        codigo: "REC-2026-0609-003",
+        pacienteId: pacientesCreados[2]._id,
+        tipo: "QUEJA",
+        descripcion: "Falta de limpieza en los servicios higiénicos.",
+        estado: "RESUELTO",
+        respuestaAdmin: "Se ha reforzado el personal de limpieza en el turno tarde.",
+        createdAt: new Date(),
+      }
+    ];
+    const reclamacionesCreadas = await Reclamacion.insertMany(reclamaciones);
+    console.log(`✅ ${reclamacionesCreadas.length} reclamaciones creadas`);
 
     // CREAR CITAS (múltiples estados y fechas)
     const citas: any[] = [];
@@ -429,7 +501,9 @@ async function seedCompleto() {
     console.log("\n📊 RESUMEN DEL SEED:");
     console.log(`   • Especialidades: ${especialidadesCreadas.length}`);
     console.log(`   • Doctores: ${doctoresCreados.length}`);
+    console.log(`   • Usuarios: ${usuariosCreados.length}`);
     console.log(`   • Pacientes: ${pacientesCreados.length}`);
+    console.log(`   • Reclamaciones: ${reclamacionesCreadas.length}`);
     console.log(`   • Citas: ${citas.length}`);
     console.log(`   • Órdenes de Examen: ${ordenes.length}`);
     console.log(`   • Medicamentos: ${medicamentosCreados.length}`);
