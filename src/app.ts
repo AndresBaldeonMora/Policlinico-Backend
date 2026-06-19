@@ -11,6 +11,7 @@ import doctorRoutes from "./routes/doctor.routes";
 import medicoRoutes from "./routes/medico.routes";
 import citaRoutes from "./routes/cita.routes";
 import horarioRoutes from "./routes/horario.routes";
+import horarioMensualRoutes from "./routes/horarioMensual.routes";
 import testRoutes from "./routes/test.routes";
 import authRoutes from "./routes/auth.routes";
 
@@ -109,6 +110,7 @@ app.use("/api/medico", medicoRoutes);
 app.use("/api/doctores", doctorRoutes);
 app.use("/api/citas", citaRoutes);
 app.use("/api/horarios", horarioRoutes);
+app.use("/api/horarios-mensuales", horarioMensualRoutes);
 app.use("/api/auth", authLimiter, authRoutes);
 
 app.use("/api/bloqueos", bloqueoRoutes);

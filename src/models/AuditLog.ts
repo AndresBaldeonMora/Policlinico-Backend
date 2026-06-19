@@ -9,6 +9,7 @@ export type EntidadAudit =
   | "Especialidad"
   | "Medicamento"
   | "BloqueoHorario"
+  | "HorarioMensual"
   | "ServicioDomicilio"
   | "CitaRemota"
   | "Reclamacion";
@@ -33,7 +34,7 @@ const auditLogSchema = new Schema<IAuditLog>({
   accion: { type: String, required: true, trim: true },
   entidad: {
     type: String,
-    enum: ["Cita", "OrdenExamen", "Paciente", "Doctor", "Usuario", "Especialidad", "Medicamento", "BloqueoHorario", "ServicioDomicilio", "CitaRemota", "Reclamacion"],
+    enum: ["Cita", "OrdenExamen", "Paciente", "Doctor", "Usuario", "Especialidad", "Medicamento", "BloqueoHorario", "HorarioMensual", "ServicioDomicilio", "CitaRemota", "Reclamacion"],
     required: true,
   },
   entidadId: { type: Schema.Types.ObjectId, required: true },

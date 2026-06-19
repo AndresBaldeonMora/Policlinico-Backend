@@ -7,10 +7,21 @@ import { crearFechaUTC } from "../utils/fecha.utils";
 
 export const crearBloqueo = async (req: AuthRequest, res: Response) => {
   try {
-    const { doctorId, fecha, motivo, descripcion } = req.body;
+    const { doctorId, fecha, motivo, descripcion, horaInicio, horaFin } = req.body;
+    const esDiaCompleto = req.body.esDiaCompleto !== false; // por defecto: día completo
 
     if (!doctorId || !fecha || !motivo) {
       return res.status(400).json({ success: false, message: "doctorId, fecha y motivo son requeridos" });
+    }
+
+    // Si es una franja horaria, validar el rango.
+    if (!esDiaCompleto) {
+      if (!horaInicio || !horaFin) {
+        return res.status(400).json({ success: false, message: "Para una franja horaria se requieren horaInicio y horaFin" });
+      }
+      if (horaInicio >= horaFin) {
+        return res.status(400).json({ success: false, message: "La hora de inicio debe ser anterior a la hora de fin" });
+      }
     }
 
     // IDOR fix: rol MEDICO sólo puede bloquear SU PROPIA agenda.
@@ -35,20 +46,35 @@ export const crearBloqueo = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ success: false, message: "Formato de fecha inválido" });
     }
 
-    // Verificar si ya existe un bloqueo activo para ese doctor y fecha
-    const bloqueoExistente = await BloqueoHorario.findOne({
-      doctorId,
-      fecha: fechaUTC,
-      activo: true,
-    });
+    // Reglas de coexistencia de bloqueos en un mismo día:
+    //  - un bloqueo de día completo no admite ningún otro bloqueo ese día;
+    //  - una franja no se permite si el día ya está bloqueado por completo;
+    //  - dos franjas no pueden solaparse.
+    const existentes = await BloqueoHorario.find({ doctorId, fecha: fechaUTC, activo: true });
+    const hayDiaCompleto = existentes.some((b) => b.esDiaCompleto !== false);
 
-    if (bloqueoExistente) {
-      return res.status(400).json({ success: false, message: "Ya existe un bloqueo activo para este doctor en esa fecha" });
+    if (esDiaCompleto) {
+      if (existentes.length > 0) {
+        return res.status(400).json({ success: false, message: "Ya existen bloqueos ese día. Elimínalos antes de bloquear el día completo." });
+      }
+    } else {
+      if (hayDiaCompleto) {
+        return res.status(400).json({ success: false, message: "El día ya está bloqueado por completo para este doctor" });
+      }
+      const seSolapa = existentes.some(
+        (b) => b.esDiaCompleto === false && (b.horaInicio as string) < horaFin && horaInicio < (b.horaFin as string)
+      );
+      if (seSolapa) {
+        return res.status(400).json({ success: false, message: "La franja se solapa con otro bloqueo existente ese día" });
+      }
     }
 
     const bloqueo = await BloqueoHorario.create({
       doctorId,
       fecha: fechaUTC,
+      esDiaCompleto,
+      horaInicio: esDiaCompleto ? undefined : horaInicio,
+      horaFin: esDiaCompleto ? undefined : horaFin,
       motivo,
       descripcion: descripcion || undefined,
       creadoPor: req.user?.userId,
@@ -67,8 +93,8 @@ export const crearBloqueo = async (req: AuthRequest, res: Response) => {
         entidad: "BloqueoHorario",
         entidadId: bloqueo._id,
         estadoNuevo: "activo",
-        descripcion: `Bloqueo creado para Dr. ${doctor.nombres} ${doctor.apellidos} el ${fecha}. Motivo: ${motivo}`,
-        detalles: { doctorId, fecha, motivo, descripcion },
+        descripcion: `Bloqueo (${esDiaCompleto ? "día completo" : `${horaInicio}-${horaFin}`}) creado para Dr. ${doctor.nombres} ${doctor.apellidos} el ${fecha}. Motivo: ${motivo}`,
+        detalles: { doctorId, fecha, esDiaCompleto, horaInicio, horaFin, motivo, descripcion },
         ipAddress: req.ip,
       });
     } catch (err) {

@@ -4,7 +4,7 @@ import { Cita, ESTADOS_OCUPAN_SLOT } from "../models/Cita";
 import { Horario } from "../models/Horario";
 import { Usuario } from "../models/Usuario";
 import mongoose from "mongoose";
-import { BloqueoHorario } from "../models/BloqueoHorario";
+import { BloqueoHorario, bloqueoCubreHora } from "../models/BloqueoHorario";
 import { crearFechaUTC, ahoraPeru, hoyPeruUTC } from "../utils/fecha.utils";
 
 // ─── Validaciones ─────────────────────────────────────────
@@ -260,20 +260,21 @@ export const obtenerHorariosDisponibles = async (req: Request, res: Response) =>
 
     const fechaUTC = crearFechaUTC(fecha as string);
 
-    // Verificar si el día está bloqueado
-    const bloqueoActivo = await BloqueoHorario.findOne({
+    // Bloqueos activos del día (día completo y/o franjas horarias)
+    const bloqueosDia = await BloqueoHorario.find({
       doctorId: id,
       fecha: fechaUTC,
       activo: true,
     });
 
-    if (bloqueoActivo) {
+    const bloqueoDiaCompleto = bloqueosDia.find((b) => b.esDiaCompleto !== false);
+    if (bloqueoDiaCompleto) {
       const horariosDisponibles = horariosBase.map((hora) => ({
         hora,
         disponible: false,
         diaBloqueado: true,
       }));
-      return res.json({ success: true, data: horariosDisponibles, diaBloqueado: true, motivoBloqueo: bloqueoActivo.motivo });
+      return res.json({ success: true, data: horariosDisponibles, diaBloqueado: true, motivoBloqueo: bloqueoDiaCompleto.motivo });
     }
 
     const citasAgendadas = await Cita.find({
@@ -293,7 +294,8 @@ export const obtenerHorariosDisponibles = async (req: Request, res: Response) =>
     const horariosDisponibles = horariosBase.map((hora) => {
       const [h, m] = hora.split(":").map(Number);
       const yaPaso = esHoy && h * 60 + m <= minutosActuales;
-      return { hora, disponible: !horasOcupadas.has(hora) && !yaPaso };
+      const bloqueada = bloqueosDia.some((b) => bloqueoCubreHora(b, hora));
+      return { hora, disponible: !horasOcupadas.has(hora) && !yaPaso && !bloqueada };
     });
 
     res.json({ success: true, data: horariosDisponibles });

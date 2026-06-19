@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import { Cita, ESTADOS_OCUPAN_SLOT } from "../models/Cita";
 import { Paciente } from "../models/Paciente";
 import { Doctor } from "../models/Doctor";
-import { BloqueoHorario } from "../models/BloqueoHorario";
+import { BloqueoHorario, bloqueoCubreHora } from "../models/BloqueoHorario";
 import { Interconsulta } from "../models/Interconsulta";
 import { verificarCitasVencidas } from "../jobs/vencimientoCitas";
 import { crearFechaUTC, hoyPeruUTC, horaPeruAInstanteUTC } from "../utils/fecha.utils";
@@ -50,16 +50,17 @@ export const crearCita = async (req: any, res: Response) => {
       return res.status(400).json({ success: false, message: "Formato de fecha inválido" });
     }
 
-    // Verificar si el día está bloqueado para este doctor
-    const bloqueoActivo = await BloqueoHorario.findOne({
-      doctorId,
-      fecha: fechaUTC,
-      activo: true,
-    });
-    if (bloqueoActivo) {
-      return res.status(400).json({
+    // Verificar si la hora solicitada cae dentro de un bloqueo activo del doctor
+    // (día completo o franja horaria).
+    const bloqueosDia = await BloqueoHorario.find({ doctorId, fecha: fechaUTC, activo: true });
+    const bloqueoConflicto = bloqueosDia.find((b) => bloqueoCubreHora(b, hora));
+    if (bloqueoConflicto) {
+      const detalle = bloqueoConflicto.esDiaCompleto === false
+        ? `franja ${bloqueoConflicto.horaInicio}–${bloqueoConflicto.horaFin}`
+        : "día completo";
+      return res.status(409).json({
         success: false,
-        message: `No se puede crear la cita: el doctor tiene el día bloqueado. Motivo: ${bloqueoActivo.motivo}`,
+        message: `No se puede crear la cita: el doctor tiene un bloqueo (${detalle}). Motivo: ${bloqueoConflicto.motivo}`,
       });
     }
 
@@ -190,16 +191,16 @@ export const reprogramarCita = async (req: Request, res: Response) => {
       return res.status(409).json({ success: false, message: "Ya existe una cita para ese horario" });
     }
 
-    // Verifica bloqueos del doctor en la nueva fecha.
-    const bloqueo = await BloqueoHorario.findOne({
+    // Verifica bloqueos del doctor que cubran la nueva hora (día completo o franja).
+    const bloqueosNuevaFecha = await BloqueoHorario.find({
       doctorId: cita.doctorId,
       fecha: fechaUTC,
       activo: true,
     });
-    if (bloqueo) {
+    if (bloqueosNuevaFecha.some((b) => bloqueoCubreHora(b, hora))) {
       return res.status(409).json({
         success: false,
-        message: "El médico tiene un bloqueo de agenda en esa fecha",
+        message: "El médico tiene un bloqueo de agenda en esa fecha/hora",
       });
     }
 
