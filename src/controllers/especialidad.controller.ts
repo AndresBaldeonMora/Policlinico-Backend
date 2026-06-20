@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { Especialidad } from "../models/Especialidad";
 import { Doctor } from "../models/Doctor";
+import { Cita } from "../models/Cita";
 
 const validarNombre = (nombre: string): string | null => {
   if (!nombre?.trim()) return "El nombre es obligatorio";
@@ -65,8 +66,10 @@ export const crearEspecialidad = async (req: Request, res: Response) => {
 // Eliminar especialidad
 export const eliminarEspecialidad = async (req: Request, res: Response) => {
   try {
+    const { id } = req.params;
+
     // GAP-A9: Verificar si hay doctores asignados a esta especialidad
-    const doctores = await Doctor.find({ especialidadId: req.params.id });
+    const doctores = await Doctor.find({ especialidadId: id });
     if (doctores.length > 0) {
       const listaDoctores = doctores.map(d => `${d.nombres} ${d.apellidos}`).join(", ");
       return res.status(409).json({
@@ -75,7 +78,21 @@ export const eliminarEspecialidad = async (req: Request, res: Response) => {
       });
     }
 
-    const especialidad = await Especialidad.findByIdAndDelete(req.params.id);
+    // GAP-A9: Verificar si existen citas activas asociadas a los doctores de esta especialidad
+    const doctorIds = await Doctor.find({ especialidadId: id }).distinct("_id");
+    const citasActivas = await Cita.find({
+      doctorId: { $in: doctorIds },
+      estado: { $in: ["PENDIENTE", "ASISTIO"] },
+    });
+
+    if (citasActivas.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: `No se puede eliminar la especialidad porque tiene ${citasActivas.length} cita(s) activa(s) pendientes.`,
+      });
+    }
+
+    const especialidad = await Especialidad.findByIdAndDelete(id);
     if (!especialidad) {
       return res.status(404).json({ success: false, message: "Especialidad no encontrada" });
     }
