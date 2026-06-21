@@ -4,15 +4,21 @@ export interface IMedicamento extends Document {
   nombre: string;
   principioActivo: string;
   presentacion: string;
+  concentracion: string;
+  formaFarmaceutica: string;
+  viaAdministracion: string;
   activo: boolean;
 }
 
 const medicamentoSchema = new Schema<IMedicamento>(
   {
-    nombre:          { type: String, required: true },
+    nombre: { type: String, required: true },
     principioActivo: { type: String, required: true },
-    presentacion:    { type: String, required: true },
-    activo:          { type: Boolean, default: true },
+    presentacion: { type: String, required: true },
+    concentracion: { type: String, default: "" },
+    formaFarmaceutica: { type: String, default: "" },
+    viaAdministracion: { type: String, default: "" },
+    activo: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

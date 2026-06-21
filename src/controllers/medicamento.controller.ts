@@ -24,7 +24,14 @@ export const listarMedicamentos = async (req: Request, res: Response) => {
 
 export const crearMedicamento = async (req: AuthRequest, res: Response) => {
   try {
-    const { nombre, principioActivo, presentacion } = req.body;
+    const {
+      nombre,
+      principioActivo,
+      presentacion,
+      concentracion,
+      formaFarmaceutica,
+      viaAdministracion,
+    } = req.body;
     if (!nombre?.trim() || !principioActivo?.trim() || !presentacion?.trim()) {
       return res.status(400).json({ success: false, message: "nombre, principioActivo y presentacion son requeridos" });
     }
@@ -32,6 +39,9 @@ export const crearMedicamento = async (req: AuthRequest, res: Response) => {
       nombre: nombre.trim(),
       principioActivo: principioActivo.trim(),
       presentacion: presentacion.trim(),
+      concentracion: concentracion?.trim() ?? "",
+      formaFarmaceutica: formaFarmaceutica?.trim() ?? "",
+      viaAdministracion: viaAdministracion?.trim() ?? "",
     });
 
     await registrarAuditoria({
@@ -50,13 +60,23 @@ export const crearMedicamento = async (req: AuthRequest, res: Response) => {
 
 export const actualizarMedicamento = async (req: AuthRequest, res: Response) => {
   try {
-    const { nombre, principioActivo, presentacion } = req.body;
+    const {
+      nombre,
+      principioActivo,
+      presentacion,
+      concentracion,
+      formaFarmaceutica,
+      viaAdministracion,
+    } = req.body;
     const med = await Medicamento.findById(req.params.id);
     if (!med) return res.status(404).json({ success: false, message: "Medicamento no encontrado" });
 
-    if (nombre?.trim())          med.nombre = nombre.trim();
+    if (nombre?.trim()) med.nombre = nombre.trim();
     if (principioActivo?.trim()) med.principioActivo = principioActivo.trim();
-    if (presentacion?.trim())    med.presentacion = presentacion.trim();
+    if (presentacion?.trim()) med.presentacion = presentacion.trim();
+    if (typeof concentracion === "string") med.concentracion = concentracion.trim();
+    if (typeof formaFarmaceutica === "string") med.formaFarmaceutica = formaFarmaceutica.trim();
+    if (typeof viaAdministracion === "string") med.viaAdministracion = viaAdministracion.trim();
     await med.save();
 
     await registrarAuditoria({
