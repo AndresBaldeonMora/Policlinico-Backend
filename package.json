@@ -4,7 +4,8 @@
   "description": "Backend API para sistema de gestión de citas médicas (MongoDB)",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "nodemon --exec ts-node src/index.ts",
+    "dev": "ts-node src/index.ts",
+    "dev:watch": "nodemon --exec ts-node src/index.ts",
     "dev:clean": "node -e \"require('fs').rmSync('node_modules/.cache',{recursive:true,force:true})\" && nodemon --exec ts-node src/index.ts",
     "seed": "ts-node src/config/seed.ts",
     "seed:completo": "ts-node src/config/seedCompleto.ts",
