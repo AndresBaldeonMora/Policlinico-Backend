@@ -299,12 +299,7 @@ export const crearOrdenRecepcion = async (req: AuthRequest, res: Response) => {
     const necesitaLab    = tipoOrden === "LABORATORIO" || tipoOrden === "MIXTA";
     const necesitaImagen = tipoOrden === "IMAGEN"      || tipoOrden === "MIXTA";
 
-    if (necesitaLab && !fechaCitaLab) {
-      return res.status(400).json({ success: false, message: "Se requiere fechaCitaLab (DD/MM/YYYY) para exámenes de laboratorio" });
-    }
-    if (necesitaImagen && !citaImagenFecha) {
-      return res.status(400).json({ success: false, message: "Se requiere citaImagenFecha (DD/MM/YYYY HH:mm) para exámenes de imagenología" });
-    }
+    // Las fechas globales son opcionales — se usan solo si se envían (para validación de capacidad)
 
     const ahora = new Date();
     let citaLabDate: Date | undefined;
@@ -362,10 +357,15 @@ export const crearOrdenRecepcion = async (req: AuthRequest, res: Response) => {
       items: items.map((item: any) => {
         const tipo = examenMap.get(String(item.examenId)) ?? "";
         const seccion: "LAB" | "IMAGEN" = TIPOS_IMAGEN.includes(tipo) ? "IMAGEN" : "LAB";
+        let fechaCitaItem: Date | undefined;
+        if (item.fechaCita) {
+          try { fechaCitaItem = new Date(item.fechaCita); } catch { /* ignorar */ }
+        }
         return {
           examenId:              item.examenId,
           seccion,
           observaciones:         item.observaciones || "",
+          ...(fechaCitaItem && { fechaCita: fechaCitaItem }),
           respuestasProtocolares: [],
           estadoItem:            "PENDIENTE",
         };

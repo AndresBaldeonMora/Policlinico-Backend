@@ -11,6 +11,7 @@ export interface IItemOrden {
   examenId: mongoose.Types.ObjectId;
   seccion: "LAB" | "IMAGEN";   // qué módulo procesa este ítem
   observaciones?: string;
+  fechaCita?: Date;             // fecha/hora individual programada para este examen
   respuestasProtocolares: IRespuestaProtocolar[];
   valorResultado?: string;
   unidadResultado?: string;
@@ -84,6 +85,7 @@ const itemOrdenSchema = new Schema<IItemOrden>(
       default: "LAB",
     },
     observaciones:           { type: String, trim: true, default: "" },
+    fechaCita:               { type: Date },
     respuestasProtocolares:  { type: [respuestaProtocolarSchema], default: [] },
     valorResultado:          { type: String, trim: true },
     unidadResultado:         { type: String, trim: true },
