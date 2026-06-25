@@ -16,7 +16,7 @@ export const crearTicket = async (req: Request, res: Response) => {
       descripcion:     descripcion.trim(),
       categoria,
       prioridad:       prioridad ?? "MEDIA",
-      creadoPorId:     user.id ?? user._id,
+      creadoPorId:     user.userId ?? user.userId ?? user.id ?? user._id,
       creadoPorNombre: `${user.nombres} ${user.apellidos}`,
     });
 
@@ -33,7 +33,7 @@ export const listarTickets = async (req: Request, res: Response) => {
     const { estado, prioridad, categoria, page = "1", limit = "20" } = req.query as Record<string, string>;
 
     const filtro: Record<string, any> = {};
-    if (user.rol === "RECEPCIONISTA") filtro.creadoPorId = user.id ?? user._id;
+    if (user.rol === "RECEPCIONISTA") filtro.creadoPorId = user.userId ?? user.id ?? user._id;
     if (estado)    filtro.estado    = estado;
     if (prioridad) filtro.prioridad = prioridad;
     if (categoria) filtro.categoria = categoria;
@@ -61,7 +61,7 @@ export const obtenerTicket = async (req: Request, res: Response) => {
     if (!ticket) return res.status(404).json({ success: false, message: "Ticket no encontrado." });
 
     // Recepcionista solo puede ver sus propios tickets
-    if (user.rol === "RECEPCIONISTA" && ticket.creadoPorId !== (user.id ?? user._id)) {
+    if (user.rol === "RECEPCIONISTA" && ticket.creadoPorId !== (user.userId ?? user.id ?? user._id)) {
       return res.status(403).json({ success: false, message: "Sin acceso." });
     }
 
@@ -88,7 +88,7 @@ export const actualizarTicket = async (req: Request, res: Response) => {
 
     // Auto-asignar al admin que actualiza si nadie asignado
     if (!ticket.asignadoAId && user.rol === "ADMINISTRADOR") {
-      ticket.asignadoAId     = user.id ?? user._id;
+      ticket.asignadoAId     = user.userId ?? user.id ?? user._id;
       ticket.asignadoANombre = `${user.nombres} ${user.apellidos}`;
     }
 
@@ -110,12 +110,12 @@ export const agregarComentario = async (req: Request, res: Response) => {
     if (!ticket) return res.status(404).json({ success: false, message: "Ticket no encontrado." });
 
     // Recepcionista solo puede comentar sus propios tickets
-    if (user.rol === "RECEPCIONISTA" && ticket.creadoPorId !== (user.id ?? user._id)) {
+    if (user.rol === "RECEPCIONISTA" && ticket.creadoPorId !== (user.userId ?? user.id ?? user._id)) {
       return res.status(403).json({ success: false, message: "Sin acceso." });
     }
 
     ticket.comentarios.push({
-      autorId:     user.id ?? user._id,
+      autorId:     user.userId ?? user.id ?? user._id,
       autorNombre: `${user.nombres} ${user.apellidos}`,
       autorRol:    user.rol,
       texto:       texto.trim(),
