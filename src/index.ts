@@ -11,6 +11,7 @@ import { initSocket } from "./config/socket";
 import { verificarOrdenesVencidas } from "./jobs/vencimientoOrdenes";
 import { verificarCitasVencidas } from "./jobs/vencimientoCitas";
 import { seedMedicamentos } from "./config/seedMedicamentos";
+import { seedPreciosExamenes } from "./config/seedPreciosExamenes";
 import cron from "node-cron";
 
 const PORT = process.env.PORT || 3000;
@@ -23,6 +24,7 @@ async function main() {
     await verificarOrdenesVencidas();
     await verificarCitasVencidas();
     await seedMedicamentos();
+    await seedPreciosExamenes();
 
     cron.schedule("*/15 * * * *", async () => {
       await verificarCitasVencidas();
