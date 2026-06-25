@@ -15,12 +15,14 @@
     "seed:usuarios": "ts-node src/config/seedUsuarios.ts",
     "cleanup:especialidades": "ts-node src/config/cleanupEspecialidades.ts",
     "seed:paciente-demo": "ts-node src/config/seedPacienteDemo.ts",
+    "seed:medico-demo": "ts-node src/config/seedMedicoDemo.ts",
     "seed:horarios": "ts-node src/config/seedHorarios.ts",
     "seed:cie10": "ts-node src/config/seedCIE10.ts",
     "seed:dia-laboral": "ts-node src/config/seedDiaLaboral.ts",
     "seed:horario-todos": "ts-node src/config/seedHorarioTodos.ts",
     "migrar:estados-vencidos": "ts-node src/config/migrarEstadosVencidos.ts",
     "clean:seed": "ts-node src/config/cleanAndSeed.ts",
+    "reset:total": "ts-node src/config/resetTotal.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },
@@ -51,7 +53,8 @@
     "node-fetch": "^3.3.2",
     "nodemailer": "^8.0.5",
     "pdfkit": "^0.18.0",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -64,6 +67,7 @@
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^8.0.0",
     "@types/pdfkit": "^0.17.5",
+    "@types/socket.io": "^3.0.1",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"

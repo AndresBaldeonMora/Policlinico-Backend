@@ -23,6 +23,9 @@ import cie10Routes from "./routes/cie10.routes";
 import adminRoutes from "./routes/admin.routes";
 import interconsultaRoutes from "./routes/interconsulta.routes";
 import reclamacionRoutes from "./routes/reclamacion.routes";
+import avisoRoutes from "./routes/aviso.routes";
+import chatRoutes from "./routes/chat.routes";
+import ticketRoutes from "./routes/ticket.routes";
 import { errorHandler } from "./middlewares/errorHandler";
 
 const app = express();
@@ -120,6 +123,9 @@ app.use("/api/cie10", cie10Routes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/interconsultas", interconsultaRoutes);
 app.use("/api/reclamaciones", reclamacionRoutes);
+app.use("/api/avisos", avisoRoutes);
+app.use("/api/chat", chatRoutes);
+app.use("/api/tickets", ticketRoutes);
 
 // /api/test sólo disponible en dev — expone info de Mongo
 if (process.env.NODE_ENV !== "production") {

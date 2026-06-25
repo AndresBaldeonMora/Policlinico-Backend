@@ -2,10 +2,12 @@ import dns from "dns";
 dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 import dotenv from "dotenv";
-dotenv.config(); // ← PRIMERO ESTO
+dotenv.config();
 
+import http from "http";
 import app from "./app";
 import connectDB from "./config/database";
+import { initSocket } from "./config/socket";
 import { verificarOrdenesVencidas } from "./jobs/vencimientoOrdenes";
 import { verificarCitasVencidas } from "./jobs/vencimientoCitas";
 import { seedMedicamentos } from "./config/seedMedicamentos";
@@ -18,19 +20,18 @@ async function main() {
     await connectDB();
     console.log("✅ Conectado a MongoDB correctamente");
 
-    // Verificar vencimientos al arrancar (cubre reinicios fuera del horario del cron)
     await verificarOrdenesVencidas();
     await verificarCitasVencidas();
-
-    // Poblar catálogo de medicamentos si está vacío
     await seedMedicamentos();
 
-    // Cron cada 15 minutos — vence citas que superaron 30 min sin asistencia
     cron.schedule("*/15 * * * *", async () => {
       await verificarCitasVencidas();
     });
 
-    app.listen(PORT, () => {
+    const httpServer = http.createServer(app);
+    initSocket(httpServer);
+
+    httpServer.listen(PORT, () => {
       console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
     });
   } catch (error) {

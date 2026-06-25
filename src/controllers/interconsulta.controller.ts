@@ -32,7 +32,7 @@ export const crearInterconsulta = async (req: AuthRequest, res: Response) => {
 
     const {
       pacienteId, citaId, especialidadSolicitada, medicoSolicitado,
-      prioridad, diagnosticoPresuntivo, motivoConsulta, preguntaClinica, informacionRelevante,
+      destinatarioId, prioridad, diagnosticoPresuntivo, motivoConsulta,
     } = req.body;
 
     if (!pacienteId || !especialidadSolicitada?.trim() || !motivoConsulta?.trim()) {
@@ -59,11 +59,10 @@ export const crearInterconsulta = async (req: AuthRequest, res: Response) => {
       solicitanteEspecialidad,
       especialidadSolicitada: especialidadSolicitada.trim(),
       medicoSolicitado: medicoSolicitado?.trim() || "",
+      destinatarioId: destinatarioId || undefined,
       prioridad: prioridad || "electiva",
       diagnosticoPresuntivo: diagnosticoPresuntivo?.trim() || "",
       motivoConsulta: motivoConsulta.trim(),
-      preguntaClinica: preguntaClinica?.trim() || "",
-      informacionRelevante: informacionRelevante?.trim() || "",
       estado: "PENDIENTE",
     });
 

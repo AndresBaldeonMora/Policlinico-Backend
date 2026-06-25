@@ -3,6 +3,9 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IBloqueoHorario extends Document {
   doctorId: mongoose.Types.ObjectId;
   fecha: Date;
+  tipoDia: "DIA_COMPLETO" | "RANGO_HORAS";
+  horaInicio?: string;
+  horaFin?: string;
   motivo: string;
   descripcion?: string;
   creadoPor: mongoose.Types.ObjectId;
@@ -21,10 +24,18 @@ const bloqueoHorarioSchema = new Schema<IBloqueoHorario>(
       type: Date,
       required: true,
     },
+    tipoDia: {
+      type: String,
+      enum: ["DIA_COMPLETO", "RANGO_HORAS"],
+      default: "DIA_COMPLETO",
+      required: true,
+    },
+    horaInicio: { type: String, trim: true },
+    horaFin:    { type: String, trim: true },
     motivo: {
       type: String,
       required: true,
-      enum: ["No asistió", "Permiso médico", "Capacitación", "Otro"],
+      enum: ["No asistió", "Permiso médico", "Capacitación", "Almuerzo", "Imprevisto", "Otro"],
     },
     descripcion: {
       type: String,

@@ -7,10 +7,15 @@ import { crearFechaUTC } from "../utils/fecha.utils";
 
 export const crearBloqueo = async (req: AuthRequest, res: Response) => {
   try {
-    const { doctorId, fecha, motivo, descripcion } = req.body;
+    const { doctorId, fecha, motivo, descripcion, tipoDia, horaInicio, horaFin } = req.body;
 
     if (!doctorId || !fecha || !motivo) {
       return res.status(400).json({ success: false, message: "doctorId, fecha y motivo son requeridos" });
+    }
+
+    const tipo = tipoDia === "RANGO_HORAS" ? "RANGO_HORAS" : "DIA_COMPLETO";
+    if (tipo === "RANGO_HORAS" && (!horaInicio || !horaFin)) {
+      return res.status(400).json({ success: false, message: "horaInicio y horaFin son requeridos para bloqueo por rango" });
     }
 
     // IDOR fix: rol MEDICO sólo puede bloquear SU PROPIA agenda.
@@ -35,20 +40,20 @@ export const crearBloqueo = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ success: false, message: "Formato de fecha inválido" });
     }
 
-    // Verificar si ya existe un bloqueo activo para ese doctor y fecha
-    const bloqueoExistente = await BloqueoHorario.findOne({
-      doctorId,
-      fecha: fechaUTC,
-      activo: true,
-    });
-
-    if (bloqueoExistente) {
-      return res.status(400).json({ success: false, message: "Ya existe un bloqueo activo para este doctor en esa fecha" });
+    // Para DIA_COMPLETO verificar que no exista ya uno ese día
+    if (tipo === "DIA_COMPLETO") {
+      const bloqueoExistente = await BloqueoHorario.findOne({ doctorId, fecha: fechaUTC, tipoDia: "DIA_COMPLETO", activo: true });
+      if (bloqueoExistente) {
+        return res.status(400).json({ success: false, message: "Ya existe un bloqueo de día completo activo para ese día" });
+      }
     }
 
     const bloqueo = await BloqueoHorario.create({
       doctorId,
       fecha: fechaUTC,
+      tipoDia: tipo,
+      horaInicio: tipo === "RANGO_HORAS" ? horaInicio : undefined,
+      horaFin:    tipo === "RANGO_HORAS" ? horaFin    : undefined,
       motivo,
       descripcion: descripcion || undefined,
       creadoPor: req.user?.userId,

@@ -249,31 +249,48 @@ export const obtenerHorariosDisponibles = async (req: Request, res: Response) =>
       return res.status(400).json({ success: false, message: "La fecha es requerida" });
     }
 
-    const horariosBase = [
-      "08:00", "08:30", "09:00", "09:30",
-      "10:00", "10:30", "11:00", "11:30", "12:00",
-      "12:30", "13:00", "13:30", "14:00", "14:30",
-      "15:00", "15:30", "16:00", "16:30", "17:00",
-      "17:30", "18:00", "18:30", "19:00", "19:30",
-      "20:00", "20:30", "21:00", "21:30", "22:00",
-    ];
-
     const fechaUTC = crearFechaUTC(fecha as string);
 
-    // Verificar si el día está bloqueado
-    const bloqueoActivo = await BloqueoHorario.findOne({
+    // Obtener los slots reales del doctor en la BD para esa fecha
+    const horariosDB = await Horario.find({ doctorId: id, fecha: fechaUTC }).sort({ hora: 1 });
+
+    // Si no hay horarios en BD para ese día, responder vacío
+    if (horariosDB.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const horariosBase = horariosDB.map((h) => h.hora);
+
+    // Obtener todos los bloqueos activos del día
+    const bloqueosActivos = await BloqueoHorario.find({
       doctorId: id,
       fecha: fechaUTC,
       activo: true,
     });
 
-    if (bloqueoActivo) {
-      const horariosDisponibles = horariosBase.map((hora) => ({
-        hora,
-        disponible: false,
+    // Día completo → todos los slots bloqueados
+    const bloqueoCompleto = bloqueosActivos.find(b => b.tipoDia === "DIA_COMPLETO");
+    if (bloqueoCompleto) {
+      return res.json({
+        success: true,
+        data: horariosBase.map((hora) => ({ hora, disponible: false, diaBloqueado: true })),
         diaBloqueado: true,
-      }));
-      return res.json({ success: true, data: horariosDisponibles, diaBloqueado: true, motivoBloqueo: bloqueoActivo.motivo });
+        motivoBloqueo: bloqueoCompleto.motivo,
+      });
+    }
+
+    // Rango de horas → marcar solo los slots dentro del rango
+    const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+    const horasBloqueadas = new Set<string>();
+    for (const b of bloqueosActivos) {
+      if (b.tipoDia === "RANGO_HORAS" && b.horaInicio && b.horaFin) {
+        const ini = toMin(b.horaInicio);
+        const fin = toMin(b.horaFin);
+        for (const hora of horariosBase) {
+          const s = toMin(hora);
+          if (s >= ini && s < fin) horasBloqueadas.add(hora);
+        }
+      }
     }
 
     const citasAgendadas = await Cita.find({
@@ -284,8 +301,6 @@ export const obtenerHorariosDisponibles = async (req: Request, res: Response) =>
 
     const horasOcupadas = new Set(citasAgendadas.map((c) => c.hora));
 
-    // Si la fecha solicitada es hoy (calendario Perú), descartar horas ya pasadas.
-    // ahoraPeru() traslada el instante a UTC-5; sus componentes UTC son la hora local peruana.
     const peru = ahoraPeru();
     const esHoy = fechaUTC.getTime() === hoyPeruUTC().getTime();
     const minutosActuales = esHoy ? peru.getUTCHours() * 60 + peru.getUTCMinutes() : -1;
@@ -293,10 +308,41 @@ export const obtenerHorariosDisponibles = async (req: Request, res: Response) =>
     const horariosDisponibles = horariosBase.map((hora) => {
       const [h, m] = hora.split(":").map(Number);
       const yaPaso = esHoy && h * 60 + m <= minutosActuales;
-      return { hora, disponible: !horasOcupadas.has(hora) && !yaPaso };
+      return { hora, disponible: !horasOcupadas.has(hora) && !horasBloqueadas.has(hora) && !yaPaso };
     });
 
     res.json({ success: true, data: horariosDisponibles });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Devuelve todos los horarios del doctor para una fecha (para bloqueo de agenda)
+export const obtenerHorariosDia = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { fecha } = req.query;
+
+    if (!fecha) {
+      return res.status(400).json({ success: false, message: "La fecha es requerida" });
+    }
+
+    const fechaUTC = crearFechaUTC(fecha as string);
+    if (isNaN(fechaUTC.getTime())) {
+      return res.status(400).json({ success: false, message: "Formato de fecha inválido" });
+    }
+
+    // Todos los slots registrados para ese día (reservados o no)
+    const slots = await Horario.find({ doctorId: id, fecha: fechaUTC }).sort({ hora: 1 });
+
+    if (slots.length > 0) {
+      return res.json({ success: true, data: slots.map(s => s.hora) });
+    }
+
+    // Si no hay registros para esa fecha, inferir horario del patrón del doctor
+    const horasUnicas = await Horario.distinct("hora", { doctorId: id });
+    horasUnicas.sort();
+    res.json({ success: true, data: horasUnicas });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

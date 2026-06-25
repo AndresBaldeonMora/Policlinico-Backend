@@ -7,6 +7,7 @@ import {
   eliminarDoctor,
   obtenerDoctoresPorEspecialidad,
   obtenerHorariosDisponibles,
+  obtenerHorariosDia,
 } from "../controllers/doctor.controller";
 import { verifyToken, requireRole } from "../middlewares/authMiddlewares";
 
@@ -21,6 +22,7 @@ router.get("/",                              listarDoctores);
 router.get("/especialidad/:especialidadId",  obtenerDoctoresPorEspecialidad);
 router.get("/:id",                           obtenerDoctor);
 router.get("/:id/horarios-disponibles",      obtenerHorariosDisponibles);
+router.get("/:id/horarios-dia",              obtenerHorariosDia);
 
 // Escritura: sólo ADMINISTRADOR.
 router.post("/",      requireRole(["ADMINISTRADOR"]), crearDoctor);

@@ -14,7 +14,7 @@ export type EntidadAudit =
   | "Reclamacion";
 
 export interface IAuditLog extends Document {
-  usuarioId: mongoose.Types.ObjectId;
+  usuarioId?: mongoose.Types.ObjectId;
   usuarioNombre?: string;
   accion: string;
   entidad: EntidadAudit;
@@ -28,7 +28,7 @@ export interface IAuditLog extends Document {
 }
 
 const auditLogSchema = new Schema<IAuditLog>({
-  usuarioId: { type: Schema.Types.ObjectId, required: true },
+  usuarioId: { type: Schema.Types.ObjectId, required: false },
   usuarioNombre: { type: String, trim: true },
   accion: { type: String, required: true, trim: true },
   entidad: {

@@ -14,7 +14,14 @@ export const crearReclamacion = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ success: false, message: "Paciente no vinculado a la cuenta" });
     }
 
-    const { tipo, descripcion } = req.body;
+    const {
+      tipo, descripcion,
+      tipoDocIdentificado, nroDocIdentificado, nombreIdentificado,
+      emailIdentificado, domicilioIdentificado, telefonoIdentificado,
+      presentadoPorTercero, tercero,
+      area, servicio, autorizaNotificacion,
+    } = req.body;
+
     if (!tipo || !["QUEJA", "RECLAMO"].includes(tipo.toUpperCase())) {
       return res.status(400).json({ success: false, message: "El tipo debe ser QUEJA o RECLAMO" });
     }
@@ -43,6 +50,12 @@ export const crearReclamacion = async (req: AuthRequest, res: Response) => {
           tipo: tipo.toUpperCase(),
           descripcion: descripcion.trim(),
           fecha: new Date(),
+          tipoDocIdentificado, nroDocIdentificado, nombreIdentificado,
+          emailIdentificado, domicilioIdentificado, telefonoIdentificado,
+          presentadoPorTercero: !!presentadoPorTercero,
+          tercero: presentadoPorTercero ? tercero : undefined,
+          area, servicio,
+          autorizaNotificacion: autorizaNotificacion !== false,
         });
         break;
       } catch (e: any) {
