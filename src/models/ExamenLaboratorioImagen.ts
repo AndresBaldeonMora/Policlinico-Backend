@@ -68,7 +68,7 @@ const examenLaboratorioImagenSchema = new Schema<IExamenLaboratorioImagen>(
     precio:                 { type: Number, default: 0, min: 0 },
     activo:                 { type: Boolean, default: true },
   },
-  { timestamps: true }
+  { timestamps: true, collection: "examenes" }
 );
 
 export const ExamenLaboratorioImagen = mongoose.model<IExamenLaboratorioImagen>(

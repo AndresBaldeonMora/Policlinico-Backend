@@ -142,7 +142,7 @@ const ordenExamenSchema = new Schema<IOrdenExamen>(
     montoPagado:        { type: Number, min: 0 },
     creadoPorRecepcion: { type: Boolean, default: false },
   },
-  { timestamps: true }
+  { timestamps: true, collection: "ordenesexamen" }
 );
 
 // Performance: queries frecuentes desde portal médico, paciente y reportes.

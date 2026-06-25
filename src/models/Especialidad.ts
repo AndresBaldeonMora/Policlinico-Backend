@@ -15,7 +15,7 @@ const especialidadSchema = new Schema<IEspecialidad>(
     examenes: [{ type: Schema.Types.ObjectId, ref: "ExamenLaboratorioImagen", default: [] }],
     consultorio:            { type: Number, min: 1, max: 100 },
   },
-  { timestamps: true }
+  { timestamps: true, collection: "especialidades" }
 );
 
 export const Especialidad = mongoose.model<IEspecialidad>(

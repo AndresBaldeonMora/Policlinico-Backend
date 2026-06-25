@@ -42,7 +42,7 @@ const doctorSchema = new Schema<IDoctor>(
     },
     avatar: { type: String, default: null },
   },
-  { timestamps: true }
+  { timestamps: true, collection: "doctores" }
 );
 
 doctorSchema.index({ especialidadId: 1 });

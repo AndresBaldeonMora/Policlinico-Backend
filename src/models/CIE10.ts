@@ -24,7 +24,7 @@ const cie10Schema = new Schema<ICIE10>(
     busqueda:    { type: String, required: true },
     capitulo:    { type: String, required: true },
   },
-  { timestamps: false }
+  { timestamps: false, collection: "cie10" }
 );
 
 // `codigo` ya queda indexado por `unique: true`.

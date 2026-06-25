@@ -73,7 +73,7 @@ const reclamacionSchema = new Schema<IReclamacion>(
     servicio:             { type: String, trim: true },
     autorizaNotificacion: { type: Boolean, default: true },
   },
-  { timestamps: true }
+  { timestamps: true, collection: "reclamaciones" }
 );
 
 export const Reclamacion = mongoose.model<IReclamacion>("Reclamacion", reclamacionSchema);

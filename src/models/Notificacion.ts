@@ -63,7 +63,7 @@ const notificacionSchema = new Schema<INotificacion, INotificacionModel>(
     link:          { type: String, trim: true, default: "" },
     eliminada:     { type: Boolean, default: false },
   },
-  { timestamps: false }
+  { timestamps: false, collection: "notificaciones" }
 );
 
 // Búsquedas más comunes: notificaciones del paciente filtradas por estado leída
