@@ -5,6 +5,7 @@ import { Paciente } from "../models/Paciente";
 import { Doctor } from "../models/Doctor";
 import { BloqueoHorario } from "../models/BloqueoHorario";
 import { Interconsulta } from "../models/Interconsulta";
+import { Notificacion } from "../models/Notificacion";
 import { verificarCitasVencidas } from "../jobs/vencimientoCitas";
 import { crearFechaUTC, hoyPeruUTC, horaPeruAInstanteUTC } from "../utils/fecha.utils";
 
@@ -819,5 +820,99 @@ export const actualizarCita = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("actualizarCita:", error);
     res.status(500).json({ success: false, message: "Error al actualizar la cita" });
+  }
+};
+
+// ── Listar citas afectadas por bloqueos (para recepcionista) ──────────────────
+// GET /api/citas/afectadas
+export const listarCitasAfectadas = async (req: Request, res: Response) => {
+  try {
+    const citas = await Cita.find({ estado: "AFECTADA" })
+      .populate("pacienteId", "nombres apellidos dni telefono correo")
+      .populate("doctorId", "nombres apellidos especialidadId")
+      .populate({ path: "doctorId", populate: { path: "especialidadId", select: "nombre" } })
+      .sort({ fecha: 1, hora: 1 })
+      .lean();
+
+    return res.json({ success: true, data: citas });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── Reprogramar cita afectada ─────────────────────────────────────────────────
+// POST /api/citas/:id/reprogramar-afectada  { nuevaFecha, nuevaHora }
+export const reprogramarCitaAfectada = async (req: any, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { nuevaFecha, nuevaHora } = req.body;
+
+    if (!nuevaFecha || !nuevaHora) {
+      return res.status(400).json({ success: false, message: "nuevaFecha y nuevaHora son requeridos" });
+    }
+
+    const citaOriginal = await Cita.findById(id)
+      .populate<{ pacienteId: any }>("pacienteId", "nombres apellidos correo")
+      .populate<{ doctorId: any }>("doctorId", "nombres apellidos");
+
+    if (!citaOriginal) {
+      return res.status(404).json({ success: false, message: "Cita no encontrada" });
+    }
+    if (citaOriginal.estado !== "AFECTADA") {
+      return res.status(400).json({ success: false, message: "Solo se pueden reprogramar citas en estado AFECTADA" });
+    }
+
+    const nuevaFechaUTC = crearFechaUTC(nuevaFecha);
+    if (isNaN(nuevaFechaUTC.getTime())) {
+      return res.status(400).json({ success: false, message: "Formato de fecha inválido" });
+    }
+
+    // Verificar que el nuevo slot esté disponible
+    const slotOcupado = await Cita.findOne({
+      doctorId: citaOriginal.doctorId,
+      fecha: nuevaFechaUTC,
+      hora: nuevaHora,
+      estado: { $nin: ["CANCELADA", "REPROGRAMADA", "AFECTADA"] },
+    });
+    if (slotOcupado) {
+      return res.status(409).json({ success: false, message: "El horario seleccionado ya está ocupado" });
+    }
+
+    // Verificar que no haya bloqueo activo en el nuevo horario
+    const bloqueoNuevo = await BloqueoHorario.findOne({ doctorId: citaOriginal.doctorId, fecha: nuevaFechaUTC, activo: true });
+    if (bloqueoNuevo) {
+      return res.status(400).json({ success: false, message: "El médico tiene bloqueado ese día. Elige otra fecha." });
+    }
+
+    // Marcar original como REPROGRAMADA
+    citaOriginal.estado = "REPROGRAMADA";
+    await citaOriginal.save();
+
+    // Crear nueva cita PENDIENTE con los mismos datos base
+    const nuevaCita = await Cita.create({
+      pacienteId: citaOriginal.pacienteId._id ?? citaOriginal.pacienteId,
+      doctorId:   citaOriginal.doctorId._id   ?? citaOriginal.doctorId,
+      fecha:      nuevaFechaUTC,
+      hora:       nuevaHora,
+      tipo:       citaOriginal.tipo,
+      estado:     "PENDIENTE",
+    });
+
+    // Notificación in-app
+    const paciente = citaOriginal.pacienteId as any;
+    const doctor   = citaOriginal.doctorId   as any;
+    const fechaStr = nuevaFechaUTC.toLocaleDateString("es-PE", { timeZone: "UTC", day: "2-digit", month: "long", year: "numeric" });
+
+    await Notificacion.crearNotificacion(
+      paciente._id ?? paciente,
+      "✅ Tu cita fue reprogramada",
+      `Tu cita con el Dr. ${doctor.nombres} ${doctor.apellidos} fue reprogramada para el ${fechaStr} a las ${nuevaHora}.`,
+      "CITA"
+    );
+
+    return res.json({ success: true, data: nuevaCita, message: "Cita reprogramada correctamente" });
+  } catch (error: any) {
+    console.error("reprogramarCitaAfectada:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };

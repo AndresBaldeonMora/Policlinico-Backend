@@ -10,7 +10,7 @@ export interface IEspecialidad extends Document {
 
 const especialidadSchema = new Schema<IEspecialidad>(
   {
-    nombre:                 { type: String, required: true, trim: true },
+    nombre:                 { type: String, required: true, trim: true, unique: true },
     tieneLaboratorioImagen: { type: Boolean, default: false },
     examenes: [{ type: Schema.Types.ObjectId, ref: "ExamenLaboratorioImagen", default: [] }],
     consultorio:            { type: Number, min: 1, max: 100 },

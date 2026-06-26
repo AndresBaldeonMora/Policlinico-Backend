@@ -209,4 +209,43 @@ export const enviarCorreoRecordatorio = async (
   });
 };
 
+export const enviarCorreoCitaAfectada = async (datos: {
+  correo: string;
+  paciente: { nombres: string; apellidos: string };
+  doctor: { nombres: string; apellidos: string };
+  fecha: string;
+  hora?: string;
+  motivoBloqueo: string;
+}) => {
+  const { correo, paciente, doctor, fecha, hora, motivoBloqueo } = datos;
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:1px solid #e0e0e0;border-radius:8px;">
+      <h2 style="color:#0f172a;border-bottom:2px solid #ef4444;padding-bottom:10px;">⚠️ Su cita ha sido afectada</h2>
+      <p>Estimado(a) <strong>${paciente.nombres} ${paciente.apellidos}</strong>,</p>
+      <p>Le comunicamos que su cita programada ha sido afectada debido a un bloqueo en la agenda del médico.</p>
+
+      <div style="background:#fef2f2;padding:15px;border-radius:6px;margin:20px 0;border-left:4px solid #ef4444;">
+        <p style="margin:5px 0;"><strong>Médico:</strong> Dr. ${doctor.nombres} ${doctor.apellidos}</p>
+        <p style="margin:5px 0;"><strong>Fecha afectada:</strong> ${fecha}</p>
+        ${hora ? `<p style="margin:5px 0;"><strong>Hora:</strong> ${hora}</p>` : ""}
+        <p style="margin:5px 0;"><strong>Motivo del bloqueo:</strong> ${motivoBloqueo}</p>
+      </div>
+
+      <p>Un recepcionista del policlínico se pondrá en contacto con usted o puede comunicarse con nosotros para reprogramar su cita a la brevedad posible.</p>
+      <p>Lamentamos los inconvenientes ocasionados.</p>
+      <br>
+      <p>Atentamente,<br><strong>Policlínico Parroquial San José</strong></p>
+      <p style="color:#999;font-size:12px;margin-top:20px;border-top:1px solid #e2e8f0;padding-top:10px;">Este es un correo automático, por favor no responda a este mensaje.</p>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"Policlínico San José" <${process.env.SMTP_USER}>`,
+    to: correo,
+    subject: "⚠️ Cita afectada — requiere reprogramación | Policlínico San José",
+    html,
+  });
+};
+
 export default transporter;

@@ -3,6 +3,9 @@ import {
   crearHorario,
   verificarDisponibilidad,
   reservarHorario,
+  obtenerSlotsPorMes,
+  crearSlotsBulk,
+  eliminarSlotsBulk,
 } from "../controllers/horario.controller";
 import { verifyToken, requireRole } from "../middlewares/authMiddlewares";
 
@@ -10,13 +13,16 @@ const router = express.Router();
 
 router.use(verifyToken);
 
-// Crear horario: sólo admin (gestión de agenda del centro).
-router.post("/", requireRole(["ADMINISTRADOR"]), crearHorario);
+const SOLO_ADMIN = requireRole(["ADMINISTRADOR"]);
 
-// Verificar disponibilidad: cualquier rol autenticado (paciente al reservar, recepción, médico).
-router.get("/:doctorId/:fecha/:hora", verificarDisponibilidad);
+// Gestión mensual (admin)
+router.get("/doctor/:doctorId",  SOLO_ADMIN, obtenerSlotsPorMes);
+router.post("/bulk",             SOLO_ADMIN, crearSlotsBulk);
+router.delete("/bulk",           SOLO_ADMIN, eliminarSlotsBulk);
 
-// Reservar: recepción, médico, paciente (cuando el self-service lo soporte).
+// CRUD individual
+router.post("/",    SOLO_ADMIN, crearHorario);
 router.put("/reservar", requireRole(["ADMINISTRADOR", "RECEPCIONISTA", "MEDICO", "PACIENTE"]), reservarHorario);
+router.get("/:doctorId/:fecha/:hora", verificarDisponibilidad);
 
 export default router;

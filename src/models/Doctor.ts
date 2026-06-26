@@ -9,6 +9,9 @@ export interface IDoctor extends Document {
   especialidadId: mongoose.Types.ObjectId;
   cmp?: string;
   avatar?: string;
+  descripcion?: string;
+  consultorio?: number;
+  turno?: "MANANA" | "TARDE" | "AMBOS";
 }
 
 const doctorSchema = new Schema<IDoctor>(
@@ -40,7 +43,10 @@ const doctorSchema = new Schema<IDoctor>(
         message: "CMP debe contener 4 a 8 dígitos",
       },
     },
-    avatar: { type: String, default: null },
+    avatar:       { type: String, default: null },
+    descripcion:  { type: String, trim: true, maxlength: 500 },
+    consultorio:  { type: Number, min: 1, max: 999 },
+    turno:        { type: String, enum: ["MANANA", "TARDE", "AMBOS"], default: "AMBOS" },
   },
   { timestamps: true, collection: "doctores" }
 );

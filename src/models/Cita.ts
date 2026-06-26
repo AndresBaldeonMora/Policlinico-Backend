@@ -10,7 +10,8 @@ export interface ICita extends Document {
   tipo: TipoCita;
   // VENCIDA se eliminó como estado: las citas que expiran (por tiempo o manual)
   // terminan en CANCELADA, con el motivo registrado en `motivoCancelacion`.
-  estado: "PENDIENTE" | "ASISTIO" | "ATENDIDA" | "CANCELADA" | "REPROGRAMADA";
+  estado: "PENDIENTE" | "ASISTIO" | "ATENDIDA" | "CANCELADA" | "REPROGRAMADA" | "AFECTADA";
+  motivoAfectacion?: string;
 
   // Vínculo cuando la cita nace como respuesta presencial a una interconsulta
   interconsultaId?: mongoose.Types.ObjectId;
@@ -131,10 +132,11 @@ const citaSchema = new Schema<ICita>(
 
     estado: {
       type: String,
-      enum: ["PENDIENTE", "ASISTIO", "ATENDIDA", "CANCELADA", "REPROGRAMADA"],
+      enum: ["PENDIENTE", "ASISTIO", "ATENDIDA", "CANCELADA", "REPROGRAMADA", "AFECTADA"],
       default: "PENDIENTE",
       required: true,
     },
+    motivoAfectacion: { type: String, required: false },
 
     fechaVigenciaHasta: {
       type: Date,

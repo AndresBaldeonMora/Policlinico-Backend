@@ -42,16 +42,10 @@ export const eliminarAviso = async (req: Request, res: Response) => {
 export const resumenDashboard = async (_req: Request, res: Response) => {
   try {
     const [
-      totalDoctores,
-      totalPacientes,
-      totalEspecialidades,
       reclamacionesPendientes,
       interconsultasPendientes,
       reclamacionesRecientes,
     ] = await Promise.all([
-      Doctor.countDocuments({}),
-      Paciente.countDocuments({}),
-      Especialidad.countDocuments({}),
       Reclamacion.countDocuments({ estado: "PENDIENTE" }),
       Interconsulta.countDocuments({ estado: "PENDIENTE" }),
       Reclamacion.find({ estado: { $in: ["PENDIENTE", "EN_REVISION"] } })
@@ -82,7 +76,7 @@ export const resumenDashboard = async (_req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
-        stats: { totalDoctores, totalPacientes, totalEspecialidades, reclamacionesPendientes, interconsultasPendientes },
+        stats: { reclamacionesPendientes, interconsultasPendientes },
         alertas,
         reclamacionesRecientes,
       },

@@ -1,9 +1,13 @@
 import { Response } from "express";
 import { BloqueoHorario } from "../models/BloqueoHorario";
 import { Doctor } from "../models/Doctor";
+import { Cita } from "../models/Cita";
+import { Paciente } from "../models/Paciente";
+import { Notificacion } from "../models/Notificacion";
 import { AuditLog } from "../models/AuditLog";
 import { AuthRequest } from "../middlewares/authMiddlewares";
 import { crearFechaUTC } from "../utils/fecha.utils";
+import { enviarCorreoCitaAfectada } from "../config/mailer";
 
 export const crearBloqueo = async (req: AuthRequest, res: Response) => {
   try {
@@ -72,12 +76,72 @@ export const crearBloqueo = async (req: AuthRequest, res: Response) => {
         entidad: "BloqueoHorario",
         entidadId: bloqueo._id,
         estadoNuevo: "activo",
-        descripcion: `Bloqueo creado para Dr. ${doctor.nombres} ${doctor.apellidos} el ${fecha}. Motivo: ${motivo}`,
+        descripcion: `Bloqueó agenda del Dr. ${doctor.nombres} ${doctor.apellidos} — ${fecha}${tipo === "RANGO_HORAS" ? ` de ${horaInicio} a ${horaFin}` : " (día completo)"}. Motivo: ${motivo}${descripcion ? `. Nota: ${descripcion}` : ""}`,
         detalles: { doctorId, fecha, motivo, descripcion },
         ipAddress: req.ip,
       });
     } catch (err) {
       console.error("Error al registrar audit log:", err);
+    }
+
+    // ── Detectar y marcar citas afectadas ────────────────────────────────
+    try {
+      const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+
+      // Buscar citas activas del doctor en esa fecha
+      const citasEnFecha = await Cita.find({
+        doctorId,
+        fecha: fechaUTC,
+        estado: { $in: ["PENDIENTE", "ASISTIO"] },
+        hora: { $ne: null },
+      }).lean();
+
+      // Filtrar las que caen dentro del rango bloqueado
+      const citasAfectadas = citasEnFecha.filter((c) => {
+        if (tipo === "DIA_COMPLETO") return true;
+        if (!c.hora || !horaInicio || !horaFin) return false;
+        const citaMin = toMin(c.hora);
+        return citaMin >= toMin(horaInicio) && citaMin < toMin(horaFin);
+      });
+
+      if (citasAfectadas.length > 0) {
+        const motivoAfectacion = `Bloqueo de agenda del Dr. ${doctor.nombres} ${doctor.apellidos} — ${fecha}${tipo === "RANGO_HORAS" ? ` de ${horaInicio} a ${horaFin}` : " (día completo)"}. Motivo: ${motivo}`;
+        const fechaStr = new Date(fechaUTC).toLocaleDateString("es-PE", { timeZone: "UTC", day: "2-digit", month: "long", year: "numeric" });
+
+        for (const cita of citasAfectadas) {
+          // Marcar cita como AFECTADA
+          await Cita.findByIdAndUpdate(cita._id, {
+            estado: "AFECTADA",
+            motivoAfectacion,
+          });
+
+          // Obtener paciente con correo
+          const paciente = await Paciente.findById(cita.pacienteId).select("nombres apellidos correo").lean();
+          if (!paciente) continue;
+
+          // Notificación in-app
+          await Notificacion.crearNotificacion(
+            cita.pacienteId,
+            "⚠️ Tu cita fue afectada por un bloqueo",
+            `Tu cita con el Dr. ${doctor.nombres} ${doctor.apellidos} del ${fechaStr}${cita.hora ? ` a las ${cita.hora}` : ""} requiere ser reprogramada. Motivo: ${motivo}`,
+            "CITA"
+          );
+
+          // Correo (falla silencioso si no tiene correo)
+          if ((paciente as any).correo) {
+            enviarCorreoCitaAfectada({
+              correo: (paciente as any).correo,
+              paciente: { nombres: paciente.nombres, apellidos: paciente.apellidos },
+              doctor: { nombres: doctor.nombres, apellidos: doctor.apellidos },
+              fecha: fechaStr,
+              hora: cita.hora ?? undefined,
+              motivoBloqueo: motivo,
+            }).catch((err) => console.error("Error enviando correo cita afectada:", err));
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error procesando citas afectadas:", err);
     }
 
     res.status(201).json({ success: true, data: bloqueoPoblado });
@@ -141,6 +205,15 @@ export const desactivarBloqueo = async (req: AuthRequest, res: Response) => {
     bloqueo.activo = false;
     await bloqueo.save();
 
+    const doctorDesactivar = await Doctor.findById(bloqueo.doctorId).select("nombres apellidos").lean();
+    const fechaStr = bloqueo.fecha.toISOString().split("T")[0];
+    const rangoHoras = bloqueo.tipoDia === "RANGO_HORAS" && bloqueo.horaInicio && bloqueo.horaFin
+      ? ` (${bloqueo.horaInicio}–${bloqueo.horaFin})`
+      : " (día completo)";
+    const descDesactivar = doctorDesactivar
+      ? `Desactivó bloqueo del Dr. ${doctorDesactivar.nombres} ${doctorDesactivar.apellidos} — ${fechaStr}${rangoHoras}. Motivo original: ${bloqueo.motivo}`
+      : `Desactivó bloqueo del ${fechaStr}${rangoHoras}`;
+
     // Registrar en AuditLog
     try {
       await AuditLog.create({
@@ -151,7 +224,7 @@ export const desactivarBloqueo = async (req: AuthRequest, res: Response) => {
         entidadId: bloqueo._id,
         estadoAnterior: "activo",
         estadoNuevo: "inactivo",
-        descripcion: `Bloqueo desactivado`,
+        descripcion: descDesactivar,
         ipAddress: req.ip,
       });
     } catch (err) {
